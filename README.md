@@ -10,7 +10,7 @@ Within Umbraco, you need to create a new document type for your blog posts. This
    - BlogContent (MarkdownEditor)
 Make a note of the alias of the document type and also the alias of the properties. e.g. `obsidian`, `title`, `blogContent`. 
 
-<img src="./assets/doctype.png" alt="Document Type"></img>
+<img src="assets/docType.png" alt="Document Type"></img>
 	
 Within Umbraco, you will need to create a new API user. 
 
