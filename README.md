@@ -1,8 +1,7 @@
 <img src="assets/UmbracidianLogo.png" alt="Document Type" width="100px"></img> 
-# Umbracidian Plugin
+# Umbracidian - a plugin for Obsidian
 
-This plugin allows you to push your Obsidian notes to Umbraco 15 as a blog post. 
-
+This plugin allows you to push your [Obsidian](https://obsidian.md/) notes to [Umbraco 15+](https://umbraco.com) as a blog post. 
 
 ## Usage
 
