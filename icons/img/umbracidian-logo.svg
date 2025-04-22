@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 13 13" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;">
-    <g transform="matrix(1,0,0,1,-0.169926,-0.169926)">
-        <g transform="matrix(0.02,0,0,0.02,-1.3333,-1.3333)">
-            <path d="M233.333,400L220.2,400C207.033,399.997 194.155,403.895 183.2,411.2L100,466.667L100,166.667C100,130.094 130.094,100 166.667,100L400,100C436.572,100 466.667,130.094 466.667,166.667L466.667,233.333M400,333.333L633.333,333.333C669.906,333.333 700,363.428 700,400L700,700L616.8,644.533C605.845,637.228 592.967,633.33 579.8,633.333L400,633.333C363.428,633.333 333.333,603.239 333.333,566.667L333.333,400C333.333,363.428 363.428,333.333 400,333.333Z" style="fill:none;fill-rule:nonzero;stroke:currentColor;stroke-width:49.68px;"/>
-        </g>
+<svg width="100%" height="100%" viewBox="0 0 24 24" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">
+    <g transform="matrix(0.0495845,0,0,0.0495845,-8.26499,-5.2272)">
+        <circle cx="408.696" cy="347.431" r="207.51" style="fill:none;stroke:currentColor;stroke-width:26.22px;"/>
+    </g>
+    <g transform="matrix(0.0465295,0,0,0.0465295,-7.58238,-3.38594)">
+        <ellipse cx="499.915" cy="265.965" rx="79.055" ry="81.466" style="fill:none;stroke:currentColor;stroke-width:27.94px;"/>
+    </g>
+    <g transform="matrix(0.0522507,0,0,0.0639931,-7.73073,-12.9741)">
+        <rect x="230.032" y="327.045" width="129.694" height="150.808" style="fill:none;stroke:currentColor;stroke-width:22.25px;"/>
     </g>
 </svg>

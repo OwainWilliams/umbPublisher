@@ -1,8 +1,9 @@
 {
   "ExpandedNodes": [
     "",
-    "\\assets"
+    "\\assets",
+    "\\methods",
+    "\\settings"
   ],
-  "SelectedNode": "\\manifest.json",
   "PreviewInSolutionExplorer": false
 }
