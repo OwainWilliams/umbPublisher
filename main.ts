@@ -192,7 +192,7 @@ export default class Umbracidian extends Plugin {
 		const body = {
 			"id": await GenerateGuid(),
 			"parent": {
-				"id": this.settings.blogParentNodeId
+				"id": this.settings.blogParentNodeId ?? null,
 			},
 			"documentType":
 				{ "id": nodeId.id },
@@ -201,7 +201,7 @@ export default class Umbracidian extends Plugin {
 				[
 					{
 						"editorAlias": "Umbraco.TextBox",
-						"alias": "title",
+						"alias": this.settings.titleAlias,
 						"culture": null,
 						"segment": null,
 						"value": pageTitle

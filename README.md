@@ -5,15 +5,39 @@ This plugin allows you to push your [Obsidian](https://obsidian.md/) notes to [U
 
 ## Usage
 
+### Setup Umbraco Document Type
+
 Within Umbraco, you need to create a new document type for your blog posts. This document type should have the following properties as a minimum:
    - Title (string)
    - BlogContent (MarkdownEditor)
 Make a note of the alias of the document type and also the alias of the properties. e.g. `obsidian`, `title`, `blogContent`. 
 
-<img src="assets/docType.png" alt="Document Type"></img>
-	
+<img src="assets/docType.png" alt="Document Type" />
+
+
+### Setup API user
+
 Within Umbraco, you will need to create a new API user. 
 
+<img src="assets/createApiUser.gif" alt="Demo of how to create an API user" />
 
+   -  Go to Users > Create API user
+   - Give the user a name and email address
+   - Give the user a User Group
+	- Once saved, go to the user and create Client Credentials. These are what are used when Obsidian connects to Umbraco.
+	- You shouldnt use this account to log in to the backoffice, this is for API use only.
 
-Within the Umbracidian settings tab, enter the URL of your Umbraco instance and the API key.
+### Setup Umbracian
+
+<img src="assets/umbracidianSettings.png" alt="Settings screen within Umbracidian">
+
+>[!Note]
+> Remeber to give your blog document type permission to either post on the root node or the parent node you are using.
+
+1. Website Url - this is the base URL of your umbraco site e.g https://owain.codes
+1. Client ID - this is setup within Umbraco when you create the API user
+1. Client Secret - this is setup within Umbraco when you create the API user
+1. Blog Parent Node UUID - this is the parent node in Umbraco where your blog posts will be created under. You can find this by going to the content tree and clicking on the node. 
+1. DocType Alias - this is the alias of the document type you created in Umbraco for your blog posts. e.g. `obsidian`
+1. Title Alias - this is the alias of the title property you created in Umbraco for your blog posts. e.g. `title`
+1. Blog Content Editor Alias - this is the alias of the blog content property you created in Umbraco for your blog posts. e.g. `blogContent`

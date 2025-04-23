@@ -10,10 +10,10 @@ export class SettingTab extends PluginSettingTab {
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
-		containerEl.createEl('h2', {text: 'Umbracidian'});
+		containerEl.createEl('h2', { text: 'Umbracidian' });
 		new Setting(containerEl)
 			.setName('Website URL')
 			.setDesc('The URL of the Umbraco website e.g. https://example.com')
@@ -24,46 +24,56 @@ export class SettingTab extends PluginSettingTab {
 					this.plugin.settings.websiteUrl = value;
 					await this.plugin.saveSettings();
 				})),
-		new Setting(containerEl)
-			.setName('Client ID')
-			.setDesc('The client ID for the Umbraco API')
-			.addText(text => text
-			.setPlaceholder('')
-			.setValue(this.plugin.settings.clientId)
-			.onChange(async (value) => {
-				this.plugin.settings.clientId = value;
-				await this.plugin.saveSettings();
-			})),
-		new Setting(containerEl)
-			.setName('Client Secret')
-			.setDesc('The client secret for the Umbraco API')
-			.addText(text => text
-			.setPlaceholder('')
-			.setValue(this.plugin.settings.clientSecret)
-			.onChange(async (value) => {
-				this.plugin.settings.clientSecret = value;
-				await this.plugin.saveSettings();
-			}).inputEl.setAttribute('type', 'password')),
-		new Setting(containerEl)
-			.setName('Blog Parent Node UUID')
-			.setDesc('The UUID of the parent node for blog posts e.g. 00000000-0000-0000-0000-00000000000')
-			.addText(text => text
-				.setPlaceholder('Enter the parent node UUID')
-				.setValue(this.plugin.settings.blogParentNodeId)
-				.onChange(async (value) => {
-					this.plugin.settings.blogParentNodeId = value;
-					await this.plugin.saveSettings();
-				})),
-		new Setting(containerEl)
-			.setName('DocType alias')
-			.setDesc('This is the alias of the DocType you want to use for your blog posts')
-			.addText(text => text
-				.setPlaceholder('Enter the DocType alias')
-				.setValue(this.plugin.settings.blogDocTypeAlias)
-				.onChange(async (value) => {
-					this.plugin.settings.blogDocTypeAlias = value;
-					await this.plugin.saveSettings();
-				})),
+			new Setting(containerEl)
+				.setName('Client ID')
+				.setDesc('The client ID for the Umbraco API')
+				.addText(text => text
+					.setPlaceholder('Client ID from Umbraco')
+					.setValue(this.plugin.settings.clientId)
+					.onChange(async (value) => {
+						this.plugin.settings.clientId = value;
+						await this.plugin.saveSettings();
+					})),
+			new Setting(containerEl)
+				.setName('Client Secret')
+				.setDesc('The client secret for the Umbraco API')
+				.addText(text => text
+					.setPlaceholder('Client Secret from Umbraco')
+					.setValue(this.plugin.settings.clientSecret)
+					.onChange(async (value) => {
+						this.plugin.settings.clientSecret = value;
+						await this.plugin.saveSettings();
+					}).inputEl.setAttribute('type', 'password')),
+			new Setting(containerEl)
+				.setName('Blog Parent Node UUID')
+				.setDesc('The UUID of the parent node for blog posts e.g. 00000000-0000-0000-0000-00000000000')
+				.addText(text => text
+					.setPlaceholder('Enter the parent node UUID')
+					.setValue(this.plugin.settings.blogParentNodeId)
+					.onChange(async (value) => {
+						this.plugin.settings.blogParentNodeId = value;
+						await this.plugin.saveSettings();
+					})),
+			new Setting(containerEl)
+				.setName('DocType alias')
+				.setDesc('This is the alias of the DocType you want to use for your blog posts')
+				.addText(text => text
+					.setPlaceholder('Enter the DocType alias')
+					.setValue(this.plugin.settings.blogDocTypeAlias)
+					.onChange(async (value) => {
+						this.plugin.settings.blogDocTypeAlias = value;
+						await this.plugin.saveSettings();
+					})),
+			new Setting(containerEl)
+				.setName('Title alias')
+				.setDesc('This should be an Umbraco.TextString property on your page')
+				.addText(text => text
+					.setPlaceholder('Enter the Title alias')
+					.setValue(this.plugin.settings.titleAlias)
+					.onChange(async (value) => {
+						this.plugin.settings.titleAlias = value;
+						await this.plugin.saveSettings();
+					})),
 			new Setting(containerEl)
 				.setName('Blog Content Editor alias')
 				.setDesc('This should be an Umbraco.MarkdownEditor property on your page')
@@ -74,5 +84,5 @@ export class SettingTab extends PluginSettingTab {
 						this.plugin.settings.blogContentAlias = value;
 						await this.plugin.saveSettings();
 					}))
-		}
+	}
 }
