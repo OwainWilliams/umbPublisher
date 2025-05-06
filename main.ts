@@ -172,9 +172,8 @@ export default class Umbracidian extends Plugin {
 	
 		const body = {
 			"id": await GenerateGuid(),
-			"parent": {
-				"id": this.settings.blogParentNodeId ?? null,
-			},
+
+			"parent": this.settings.blogParentNodeId ? { "id": this.settings.blogParentNodeId } : null,
 			"documentType":
 				{ "id": nodeId.id },
 			"template": null,
