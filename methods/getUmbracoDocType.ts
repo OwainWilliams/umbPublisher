@@ -18,7 +18,6 @@ export async function GetUmbracoDocType(docType: string, websiteUrl: string, tok
 
         const jsonDocType = obsidianDocTypeRaw.json;
         if (jsonDocType && jsonDocType.items && jsonDocType.items.length > 0) {
-            //console.log('Obsidian document type found:', obsidianDocType.items[0]);
             return jsonDocType.items[0]; // Return the first document type found
         } else {
             new Notice('No Obsidian document type found.');

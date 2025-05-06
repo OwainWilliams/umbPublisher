@@ -22,7 +22,6 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 		return response; // Return the parsed JSON response
 	}
 	catch (error) {
-		console.error('Error in CallUmbracoApi:', error);
 		new Notice('Error in CallUmbracoApi: ' + error.message);
 		return null;
 	}

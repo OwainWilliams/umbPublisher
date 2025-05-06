@@ -172,10 +172,8 @@ export default class Umbracidian extends Plugin {
 	
 		const body = {
 			"id": await GenerateGuid(),
-
 			"parent": this.settings.blogParentNodeId ? { "id": this.settings.blogParentNodeId } : null,
-			"documentType":
-				{ "id": nodeId.id },
+			"documentType":	{ "id": nodeId.id },
 			"template": null,
 			"values":
 				[
@@ -222,14 +220,12 @@ export default class Umbracidian extends Plugin {
 			const response = await CallUmbracoApi(endpoint, token, 'POST', body);
 			if (response != null) {
 				new Notice('Node created successfully!');
-				console.log('Node created successfully:', response);
 			} else {
 				new Notice('Failed to create node.');
 			}
 		}
 		catch (error) {
 			new Notice('Error creating node: ' + error.message);
-			console.error('Error creating node:', error);
 		}
 		
 	}
