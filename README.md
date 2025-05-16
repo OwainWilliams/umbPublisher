@@ -3,6 +3,11 @@
 
 This plugin allows you to push your [Obsidian](https://obsidian.md/) notes to [Umbraco 15+](https://umbraco.com) as a blog post. 
 
+This plugin is currently awaiting PR to be added as an "official" plugin, but in the mean time, you can manually add this plugin to your Obsidian install copying over main.js, manifest.json to your vault folder `VaultFolder/.obsidian/plugins/umbracidian/`
+
+You can get the files from the [latest release](https://github.com/OwainWilliams/Umbracidian/releases/tag/1.0.0)
+
+
 ## Usage
 
 ### Setup Umbraco Document Type
