@@ -5,7 +5,9 @@ This plugin allows you to push your [Obsidian](https://obsidian.md/) notes to [U
 
 This plugin is currently awaiting PR to be added as an "official" plugin, but in the mean time, you can manually add this plugin to your Obsidian install copying over main.js, manifest.json to your vault folder `VaultFolder/.obsidian/plugins/umbracidian/`
 
-You can get the files from the [latest release](https://github.com/OwainWilliams/Umbracidian/releases/tag/1.0.0)
+You can get the files from the [latest release](https://github.com/OwainWilliams/Umbracidian/releases/tag/1.0.0) or copy the powershell script `getLatest.ps1` in to your plugins folder `/plugins/umbracidian` and run the script. This will download the latest manifest and javascript files for you. (Thanks Paul Seal for the suggestion)
+
+If you get an error when running the powershell script in Terminal, you may need to run Terminal as an Admin and run `set-executionpolicy remotesigned` 
 
 
 ## Usage
