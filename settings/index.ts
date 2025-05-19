@@ -46,7 +46,7 @@ export class SettingTab extends PluginSettingTab {
 					}).inputEl.setAttribute('type', 'password')),
 			new Setting(containerEl)
 				.setName('Blog Parent Node UUID')
-				.setDesc('The UUID of the parent node for blog posts e.g. 00000000-0000-0000-0000-00000000000')
+				.setDesc('The UUID of the parent node for blog posts e.g. 00000000-0000-0000-0000-00000000000, leave empty for root')
 				.addText(text => text
 					.setPlaceholder('Enter the parent node UUID')
 					.setValue(this.plugin.settings.blogParentNodeId)

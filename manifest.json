@@ -1,10 +1,10 @@
 {
-	"id": "Umbracidian",
+	"id": "umbracidian",
 	"name": "Umbracidian",
 	"version": "1.0.0",
-	"minAppVersion": "0.15.0",
+	"minAppVersion": "1.8.10",
 	"description": "Push notes to Umbraco CMS as blog posts.",
-	"author": "OwainCodes",
+	"author": "Owain Williams",
 	"authorUrl": "https://owain.codes",
 	"fundingUrl": "https://buymeacoffee.com/owaincodes",
 	"isDesktopOnly": false
