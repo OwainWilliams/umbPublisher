@@ -7,6 +7,7 @@ import { UmbracidianIcons } from "./icons/icons";
 import { GetUmbracoDocType } from "./methods/getUmbracoDocType";
 import { CallUmbracoApi } from "./methods/callUmbracoApi";
 import { GenerateGuid } from 'methods/generateGuid';
+import { GetUmbracoSiteNodes } from 'methods/getUmbracoSiteNodes';
 const matter = require("gray-matter");
 
 
@@ -39,9 +40,11 @@ export default class Umbracidian extends Plugin {
 			}
 			this.bearerToken = await this.getBearerToken();
 
-			const umbracoDocType = await GetUmbracoDocType(this.settings.blogDocTypeAlias, this.settings.websiteUrl, this.bearerToken);
+		//	const umbracoDocType = await GetUmbracoDocType(this.settings.blogDocTypeAlias, this.settings.websiteUrl, this.bearerToken);
 			
-			await this.createObsidianNode(view, umbracoDocType, this.settings.websiteUrl);
+		//	await this.createObsidianNode(view, umbracoDocType, this.settings.websiteUrl);
+
+		await GetUmbracoSiteNodes(this.settings.blogDocTypeAlias, this.settings.websiteUrl, this.bearerToken);
 
 		});
 

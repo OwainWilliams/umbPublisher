@@ -1,5 +1,6 @@
 import Umbracidian from "main";
 import { App, PluginSettingTab, Setting } from "obsidian";
+import { GetUmbracoSiteNodes } from "methods/getUmbracoSiteNodes";
 
 export class SettingTab extends PluginSettingTab {
 	plugin: Umbracidian;
@@ -83,6 +84,27 @@ export class SettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.blogContentAlias = value;
 						await this.plugin.saveSettings();
-					}))
+					})),
+					// Add a dropdown with a list of Nodes from GetUmbracoSiteNodes
+			new Setting(containerEl)
+				.setName('Select DocType')
+				.setDesc('Select the DocType you want to use for your blog posts')
+				.addDropdown(async (dropdown) => {
+					const token = this.plugin.bearerToken;
+					const websiteUrl = this.plugin.settings.websiteUrl;
+					const docType = this.plugin.settings.blogDocTypeAlias;
+
+					if (!token) {
+						new Notice('Bearer token is null. Please check your settings.');
+						return;
+					}
+
+					const siteRootJson = await GetUmbracoSiteNodes(docType, websiteUrl, token);
+					if (siteRootJson) {
+						siteRootJson.forEach((node: any) => {
+							dropdown.addOption(node.id, node.name);
+						});
+					}
+				})),
 	}
 }
