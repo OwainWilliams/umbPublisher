@@ -1,4 +1,4 @@
-$Repo = "OwainWilliams/Umbracidian"  # Replace with your actual repository name
+$Repo = "OwainWilliams/umbPublisher"  # Replace with your actual repository name
 $ManifestFile = "manifest.json"
 $JSFile = "main.js"
 

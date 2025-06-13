@@ -1,10 +1,10 @@
-import Umbracidian from "main";
+import umbPublisher from "main";
 import { App, PluginSettingTab, Setting } from "obsidian";
 
 export class SettingTab extends PluginSettingTab {
-	plugin: Umbracidian;
+	plugin: umbPublisher;
 
-	constructor(app: App, plugin: Umbracidian) {
+	constructor(app: App, plugin: umbPublisher) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -13,7 +13,7 @@ export class SettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-		containerEl.createEl('h2', { text: 'Umbracidian' });
+		
 		new Setting(containerEl)
 			.setName('Website URL')
 			.setDesc('The URL of the Umbraco website e.g. https://example.com')
@@ -35,17 +35,17 @@ export class SettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})),
 			new Setting(containerEl)
-				.setName('Client Secret')
+				.setName('Client secret')
 				.setDesc('The client secret for the Umbraco API')
 				.addText(text => text
-					.setPlaceholder('Client Secret from Umbraco')
+					.setPlaceholder('Client secret from Umbraco')
 					.setValue(this.plugin.settings.clientSecret)
 					.onChange(async (value) => {
 						this.plugin.settings.clientSecret = value;
 						await this.plugin.saveSettings();
 					}).inputEl.setAttribute('type', 'password')),
 			new Setting(containerEl)
-				.setName('Blog Parent Node UUID')
+				.setName('Blog parent node UUID')
 				.setDesc('The UUID of the parent node for blog posts e.g. 00000000-0000-0000-0000-00000000000, leave empty for root')
 				.addText(text => text
 					.setPlaceholder('Enter the parent node UUID')
@@ -75,7 +75,7 @@ export class SettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})),
 			new Setting(containerEl)
-				.setName('Blog Content Editor alias')
+				.setName('Blog content editor alias')
 				.setDesc('This should be an Umbraco.MarkdownEditor property on your page')
 				.addText(text => text
 					.setPlaceholder('Enter the Property alias')
