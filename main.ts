@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
 import { Editor, MarkdownView, Notice, Plugin, requestUrl } from 'obsidian';
-import { DEFAULT_SETTINGS, umbPublisherSettings } from "./types/index";
+import { DEFAULT_SETTINGS, umbpublisherSettings } from "./types/index";
 import { SettingTab } from "./settings";
-import { umbPublisherIcons } from "./icons/icons";
+import { umbpublisherIcons } from "./icons/icons";
 import { GetUmbracoDocType } from "./methods/getUmbracoDocType";
 import { CallUmbracoApi } from "./methods/callUmbracoApi";
 import { GenerateGuid } from 'methods/generateGuid';
@@ -20,10 +20,10 @@ interface Frontmatter {
 	content: string;
 }
 
-export default class umbPublisher extends Plugin {
-	settings: umbPublisherSettings;
+export default class umbpublisher extends Plugin {
+	settings: umbpublisherSettings;
 
-	private icons = new umbPublisherIcons();
+	private icons = new umbpublisherIcons();
 	private bearerToken: null | string = null; // Initialize bearerToken to null
 
 	async onload() {
@@ -31,7 +31,7 @@ export default class umbPublisher extends Plugin {
 
 		this.icons.registerIcons();
 		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('umbPublisher-logo', 'umbPublisher', async (evt: MouseEvent) => {
+		this.addRibbonIcon('umbpublisher-logo', 'umbpublisher', async (evt: MouseEvent) => {
 			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 			if (!view) {
 				new Notice('No active Markdown view found.');

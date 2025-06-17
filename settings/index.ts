@@ -1,10 +1,10 @@
-import umbPublisher from "main";
+import umbpublisher from "main";
 import { App, PluginSettingTab, Setting } from "obsidian";
 
 export class SettingTab extends PluginSettingTab {
-	plugin: umbPublisher;
+	plugin: umbpublisher;
 
-	constructor(app: App, plugin: umbPublisher) {
+	constructor(app: App, plugin: umbpublisher) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}

@@ -1,5 +1,5 @@
 {
-	"name": "umbPublisher",
+	"name": "umbpublisher",
 	"version": "0.1.0",
 	"description": "Send Blog Posts to Umbraco CMS via Management API",
 	"main": "main.js",
