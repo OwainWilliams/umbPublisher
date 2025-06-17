@@ -1,5 +1,5 @@
 {
-	"id": "umbPublisher",
+	"id": "umbpublisher",
 	"name": "Umbraco Publisher",
 	"version": "1.0.0",
 	"minAppVersion": "1.8.10",
