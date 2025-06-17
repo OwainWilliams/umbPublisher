@@ -1,4 +1,4 @@
-<img src="assets/umbpublisher-Logo.png" alt="Document Type" width="100px"></img> 
+<img src="assets/umbPublisher-Logo.png" alt="Document Type" width="100px"></img> 
 # umbpublisher - a plugin for Obsidian
 
 This plugin allows you to push your [Obsidian](https://obsidian.md/) notes to [Umbraco 15+](https://umbraco.com) as a blog post. 
