@@ -1,6 +1,6 @@
 {
 	"name": "umbpublisher",
-	"version": "0.1.0",
+	"version": "1.0.2",
 	"description": "Send Blog Posts to Umbraco CMS via Management API",
 	"main": "main.js",
 	"scripts": {
@@ -32,10 +32,10 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/OwainWilliams/Umbracidian.git"
+		"url": "git+https://github.com/OwainWilliams/umbPublisher.git"
 	},
 	"bugs": {
-		"url": "https://github.com/OwainWilliams/Umbracidian/issues"
+		"url": "https://github.com/OwainWilliams/umbPublisher/issues"
 	},
-	"homepage": "https://github.com/OwainWilliams/Umbracidian/"
+	"homepage": "https://github.com/OwainWilliams/umbPublisher/"
 }
