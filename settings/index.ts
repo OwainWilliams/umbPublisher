@@ -21,7 +21,9 @@ export class SettingTab extends PluginSettingTab {
 				.setPlaceholder('Enter the website URL')
 				.setValue(this.plugin.settings.websiteUrl)
 				.onChange(async (value) => {
-					this.plugin.settings.websiteUrl = value;
+					const match = value.match(/^(https?:\/\/[^\/]+)/i);
+        			const sanitized = match ? match[1] : value.replace(/\/.*$/, '');
+        			this.plugin.settings.websiteUrl = sanitized;
 					await this.plugin.saveSettings();
 				})),
 			new Setting(containerEl)
