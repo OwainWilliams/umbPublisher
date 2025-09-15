@@ -1,7 +1,7 @@
 {
 	"name": "umbpublisher",
-	"version": "1.0.2",
-	"description": "Send Blog Posts to Umbraco CMS via Management API",
+	"version": "1.1.0",
+	"description": "Send Obsidian Notes to Umbraco CMS via Management API",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
