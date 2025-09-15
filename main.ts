@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
 import { Editor, MarkdownView, Notice, Plugin, requestUrl } from 'obsidian';
-import { DEFAULT_SETTINGS, UmbracidianSettings } from "./types/index";
+import { DEFAULT_SETTINGS, umbpublisherSettings } from "./types/index";
 import { SettingTab } from "./settings";
-import { UmbracidianIcons } from "./icons/icons";
+import { umbpublisherIcons } from "./icons/icons";
 import { GetUmbracoDocType } from "./methods/getUmbracoDocType";
 import { CallUmbracoApi } from "./methods/callUmbracoApi";
 import { GenerateGuid } from 'methods/generateGuid';
-const matter = require("gray-matter");
+
 
 
 interface Frontmatter {
@@ -20,10 +20,10 @@ interface Frontmatter {
 	content: string;
 }
 
-export default class Umbracidian extends Plugin {
-	settings: UmbracidianSettings;
+export default class umbpublisher extends Plugin {
+	settings: umbpublisherSettings;
 
-	private icons = new UmbracidianIcons();
+	private icons = new umbpublisherIcons();
 	private bearerToken: null | string = null; // Initialize bearerToken to null
 
 	async onload() {
@@ -31,7 +31,7 @@ export default class Umbracidian extends Plugin {
 
 		this.icons.registerIcons();
 		// This creates an icon in the left ribbon.
-		this.addRibbonIcon('umbracidian-logo', 'Umbracidian', async (evt: MouseEvent) => {
+		this.addRibbonIcon('umbpublisher-logo', 'umbpublisher', async (evt: MouseEvent) => {
 			const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 			if (!view) {
 				new Notice('No active Markdown view found.');
@@ -48,18 +48,24 @@ export default class Umbracidian extends Plugin {
 		// This adds an editor command that can perform some operation on the current editor instance
 		this.addCommand({
 			id: 'push-to-umbraco',
-			name: 'Push to Umbraco command',
-			editorCallback: async (editor: Editor) => {
-				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (!view) {
+			name: 'Push to Umbraco',
+			editorCheckCallback: (checking: boolean, editor: Editor, view: MarkdownView) => 
+			{
+				if(checking) return true;
+
+				const value = this.app.workspace.getActiveViewOfType(MarkdownView);
+
+				if(!value){
 					new Notice('No active Markdown view found.');
 					return;
 				}
+				(async () => {
 				this.bearerToken = await this.getBearerToken();
-				
 				const umbracoDocType = await GetUmbracoDocType(this.settings.blogDocTypeAlias, this.settings.websiteUrl, this.bearerToken);
 				await this.createObsidianNode(view, umbracoDocType, this.settings.websiteUrl);
+				})();
 			}
+		
 		});
 
 		// This adds a settings tab so the user can configure various aspects of the plugin
@@ -105,18 +111,16 @@ export default class Umbracidian extends Plugin {
 				body: body.toString(),
 			});
 	
-			// Check if the response contains valid JSON
+			
 			if (response.json) {
 				const data = response.json as { access_token: string };
-			//	console.log('Bearer token response:', data);
-				return data.access_token; // Assuming the token is in the "access_token" field
+			
+				return data.access_token;
 			} else {
-			//	console.error('Empty or invalid JSON response:', response);
 				new Notice('Failed to fetch bearer token.');
 				return null;
 			}
 		} catch (error) {
-		//	console.error('Error fetching bearer token:', error);
 			new Notice(`Error fetching bearer token: ${error}`);
 			return null;
 		}
@@ -130,9 +134,17 @@ export default class Umbracidian extends Plugin {
 			return null;
 		}
 
-		const metaMatter = this.app.metadataCache.getFileCache(noteFile)?.frontmatter;
-		const pageContent = matter(view.getViewData());
-		
+		const fileCache = this.app.metadataCache.getFileCache(noteFile);
+		const metaMatter = fileCache?.frontmatter;
+		const fileContent = await this.app.vault.read(noteFile);
+
+		let content = fileContent;
+		if (fileCache?.frontmatterPosition) {
+			const { start, end } = fileCache.frontmatterPosition;
+			const lines = fileContent.split('\n');
+			content = lines.slice(end.line + 1).join('\n');
+		}
+
 		const frontmatter = {
 			title: metaMatter?.title || view.file?.basename,
 			tags: metaMatter?.tags || [],
@@ -140,14 +152,13 @@ export default class Umbracidian extends Plugin {
 			status: metaMatter?.published ? "published" : "draft",
 			excerpt: metaMatter?.excerpt || undefined,
 			feature_image: metaMatter?.feature_image || undefined,
-			content: pageContent.content,
+			content: content,
 		};
 		if (!frontmatter) {
 			new Notice('No frontmatter found.');
 			return null;
 		}
 		else {
-		//	console.log('Meta matter:', frontmatter);
 			return frontmatter;
 		}
 

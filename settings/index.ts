@@ -1,27 +1,93 @@
-import Umbracidian from "main";
-import { App, PluginSettingTab, Setting } from "obsidian";
+import umbpublisher from "main";
+import { App, PluginSettingTab, Setting, requestUrl, Notice } from "obsidian";
+
+async function getBearerToken(websiteUrl: string, clientId: string, clientSecret: string): Promise<string | null> {
+    const tokenEndpoint = `${websiteUrl}/umbraco/management/api/v1/security/back-office/token`;
+    const body = new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: clientId,
+        client_secret: clientSecret,
+    });
+    try {
+        const response = await requestUrl({
+            url: tokenEndpoint,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+        });
+        return (response.json as any).access_token;
+    } catch (e) {
+        new Notice('Failed to fetch bearer token');
+        return null;
+    }
+}
+
+async function fetchContentTree(websiteUrl: string, token: string): Promise<any[]> {
+    const endpoint = `${websiteUrl}/umbraco/management/api/v1/tree/document-type/root`;
+    const response = await requestUrl({
+        url: endpoint,
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return (response.json as any).items || [];
+}
+
+// Recursively fetch all nodes and their children
+async function fetchAllContentNodes(
+    websiteUrl: string,
+    token: string,
+    parentId: string | null = null,
+    depth: number = 0
+): Promise<any[]> {
+    const endpoint = parentId
+        ? `${websiteUrl}/umbraco/management/api/v1/tree/document/children?parentId=${parentId}`
+        : `${websiteUrl}/umbraco/management/api/v1/tree/document/root?skip=0&take=100&foldersOnly=false`;
+
+    const response = await requestUrl({
+        url: endpoint,
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+    });
+
+    const items = (response.json as any).items || [];
+    let allNodes: any[] = [];
+
+    for (const item of items) {
+        // Add current node with depth for indentation
+        allNodes.push({ ...item, depth });
+        // Recursively fetch children
+        const children = await fetchAllContentNodes(websiteUrl, token, item.id, depth + 1);
+        allNodes = allNodes.concat(children);
+    }
+
+    return allNodes;
+}
 
 export class SettingTab extends PluginSettingTab {
-	plugin: Umbracidian;
+    plugin: umbpublisher;
+    private cachedNodes: any[] = []; // Store fetched nodes
 
-	constructor(app: App, plugin: Umbracidian) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
+    constructor(app: App, plugin: umbpublisher) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
 
-	display(): void {
-		const { containerEl } = this;
+    display(): void {
+        let parentNodeDropdown: HTMLSelectElement | null = null;
+        let fetchButton: HTMLButtonElement | null = null;
+        const { containerEl } = this;
+        containerEl.empty();
 
-		containerEl.empty();
-		containerEl.createEl('h2', { text: 'Umbracidian' });
-		new Setting(containerEl)
-			.setName('Website URL')
-			.setDesc('The URL of the Umbraco website e.g. https://example.com')
-			.addText(text => text
-				.setPlaceholder('Enter the website URL')
-				.setValue(this.plugin.settings.websiteUrl)
-				.onChange(async (value) => {
-					this.plugin.settings.websiteUrl = value;
+        new Setting(containerEl)
+            .setName('Website URL')
+            .setDesc('The URL of the Umbraco website e.g. https://example.com')
+            .addText(text => text
+                .setPlaceholder('Enter the website URL')
+                .setValue(this.plugin.settings.websiteUrl)
+                .onChange(async (value) => {
+                    const match = value.match(/^(https?:\/\/[^\/]+)/i);
+        			const sanitized = match ? match[1] : value.replace(/\/.*$/, '');
+        			this.plugin.settings.websiteUrl = sanitized;
 					await this.plugin.saveSettings();
 				})),
 			new Setting(containerEl)
@@ -35,25 +101,80 @@ export class SettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					})),
 			new Setting(containerEl)
-				.setName('Client Secret')
+				.setName('Client secret')
 				.setDesc('The client secret for the Umbraco API')
 				.addText(text => text
-					.setPlaceholder('Client Secret from Umbraco')
+					.setPlaceholder('Client secret from Umbraco')
 					.setValue(this.plugin.settings.clientSecret)
 					.onChange(async (value) => {
 						this.plugin.settings.clientSecret = value;
 						await this.plugin.saveSettings();
 					}).inputEl.setAttribute('type', 'password')),
-			new Setting(containerEl)
-				.setName('Blog Parent Node UUID')
-				.setDesc('The UUID of the parent node for blog posts e.g. 00000000-0000-0000-0000-00000000000, leave empty for root')
+			 new Setting(containerEl)
+            .setName('Pick content parent node')
+            .setDesc('Fetch and select a parent node from Umbraco where content will be saved under')
+            .addButton(button => {
+                fetchButton = button.buttonEl;
+                button.setButtonText('Fetch nodes').onClick(async () => {
+                    const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
+                    if (!websiteUrl || !clientId || !clientSecret) {
+                        new Notice('Please enter Website URL, Client Id, and Client Secret first.');
+                        return;
+                    }
+                    const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+                    if (!token) return;
+                    // Fetch all nodes recursively and cache them
+                    this.cachedNodes = await fetchAllContentNodes(websiteUrl, token);
+                    if (parentNodeDropdown) {
+                        parentNodeDropdown.innerHTML = '';
+                        const rootOption = document.createElement('option');
+                        rootOption.value = '';
+                        rootOption.text = '[Select Node]';
+                        parentNodeDropdown.appendChild(rootOption);
+                        this.cachedNodes.forEach(node => {
+                            const option = document.createElement('option');
+                            option.value = node.id;
+                            option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
+                            parentNodeDropdown?.appendChild(option);
+                        });
+                        parentNodeDropdown.value = this.plugin.settings.blogParentNodeId || '';
+                    }
+                });
+            })
+            .addDropdown(dropdown => {
+                parentNodeDropdown = dropdown.selectEl;
+                // Populate dropdown from cache if available
+                parentNodeDropdown.innerHTML = '';
+                const rootOption = document.createElement('option');
+                rootOption.value = '';
+                rootOption.text = '[Select Node]';
+                parentNodeDropdown.appendChild(rootOption);
+                if (this.cachedNodes.length > 0) {
+                    this.cachedNodes.forEach(node => {
+                        const option = document.createElement('option');
+                        option.value = node.id;
+                        option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
+                        parentNodeDropdown?.appendChild(option);
+                    });
+                }
+                parentNodeDropdown.value = this.plugin.settings.blogParentNodeId || '';
+
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.blogParentNodeId = value;
+                    this.display();
+                    await this.plugin.saveSettings();
+                    
+                });
+                
+            }),
+                    new Setting(containerEl)
+				.setName('Blog parent node UUID')
+				.setDesc('For reference, this is fetched from the node picker above')
 				.addText(text => text
-					.setPlaceholder('Enter the parent node UUID')
+					.setPlaceholder('Fetched from node picker above')
 					.setValue(this.plugin.settings.blogParentNodeId)
-					.onChange(async (value) => {
-						this.plugin.settings.blogParentNodeId = value;
-						await this.plugin.saveSettings();
-					})),
+					.setDisabled(true)
+					),
 			new Setting(containerEl)
 				.setName('DocType alias')
 				.setDesc('This is the alias of the DocType you want to use for your blog posts')
@@ -71,11 +192,11 @@ export class SettingTab extends PluginSettingTab {
 					.setPlaceholder('Enter the Title alias')
 					.setValue(this.plugin.settings.titleAlias)
 					.onChange(async (value) => {
-						this.plugin.settings.titleAlias = value;
+					 this.plugin.settings.titleAlias = value;
 						await this.plugin.saveSettings();
 					})),
 			new Setting(containerEl)
-				.setName('Blog Content Editor alias')
+				.setName('Blog content editor alias')
 				.setDesc('This should be an Umbraco.MarkdownEditor property on your page')
 				.addText(text => text
 					.setPlaceholder('Enter the Property alias')
@@ -83,6 +204,6 @@ export class SettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.blogContentAlias = value;
 						await this.plugin.saveSettings();
-					}))
+					}));
 	}
 }

@@ -1,4 +1,4 @@
-export interface UmbracidianSettings {
+export interface umbpublisherSettings {
     mySetting: string;
     websiteUrl: string;
     blogParentNodeId: string;
@@ -9,7 +9,7 @@ export interface UmbracidianSettings {
 	blogContentAlias: string;
 }
 
-export const DEFAULT_SETTINGS: UmbracidianSettings = {
+export const DEFAULT_SETTINGS: umbpublisherSettings = {
     mySetting: 'default',
     blogParentNodeId: 'null',
     blogDocTypeAlias: 'BlogPost',

@@ -1,9 +1,9 @@
 import { addIcon } from "obsidian";
 
-import umbracoLogo from "./img/umbracidian-logo.svg";
+import umbPublisherLogo from "./img/umbpublisher-logo.svg";
 
-export class UmbracidianIcons {
-    private icons = [{ iconId: "umbracidian-logo", svg: umbracoLogo }];
+export class umbpublisherIcons {
+    private icons = [{ iconId: "umbpublisher-logo", svg: umbPublisherLogo }];
 
     registerIcons = () => {
         this.icons.forEach(({ iconId, svg }) => {
