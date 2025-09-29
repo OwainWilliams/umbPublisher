@@ -194,7 +194,8 @@ export default class umbpublisher extends Plugin {
 			return;
 		}
 	
-	const endpoint = `${websiteUrl}/umbraco/management/api/v1/document`;
+	const validateEndpoint = `${websiteUrl}/umbraco/management/api/v1/document/validate`;
+	const createEndpoint = `${websiteUrl}/umbraco/management/api/v1/document`;
 	const nodeId = obsidianDoctype.id;
 
 	const pageTitle = await this.getLeafTitle();
@@ -247,8 +248,8 @@ export default class umbpublisher extends Plugin {
 				: null
 		};
 
-		console.log('Creating Umbraco node with:');
-		console.log('Endpoint:', endpoint);
+		console.log('Validating Umbraco node with:');
+		console.log('Validate Endpoint:', validateEndpoint);
 		console.log('Document Type ID:', nodeId);
 		console.log('Parent Node ID:', this.settings.blogParentNodeId);
 		console.log('Request Body:', JSON.stringify(body, null, 2));
@@ -261,10 +262,23 @@ export default class umbpublisher extends Plugin {
 		}
 	    
 		try{
-			const response = await CallUmbracoApi(endpoint, token, 'POST', body);
+			// First, validate the document
+			console.log('Validating document...');
+			const validateResponse = await CallUmbracoApi(validateEndpoint, token, 'POST', body);
+			
+			if (validateResponse == null) {
+				new Notice('Document validation failed - no response received.');
+				return;
+			}
+			
+			console.log('Document validation successful:', validateResponse);
+			
+			// If validation succeeds, proceed with document creation
+			console.log('Creating Umbraco node...');
+			const createResponse = await CallUmbracoApi(createEndpoint, token, 'POST', body);
 		
-			if (response != null) {
-				console.log('Node creation successful:', response);
+			if (createResponse != null) {
+				console.log('Node creation successful:', createResponse);
 				new Notice('Node created successfully!');
 			} else {
 				new Notice('Failed to create node - no response received.');
@@ -272,6 +286,10 @@ export default class umbpublisher extends Plugin {
 		}
 		catch (error) {
 			console.error('Error in createObsidianNode:', error);
-			new Notice('Error creating node: ' + error.message);
+			if (error.message && error.message.includes('validate')) {
+				new Notice('Document validation failed: ' + error.message);
+			} else {
+				new Notice('Error creating node: ' + error.message);
+			}
 		}	}
 }
