@@ -4,7 +4,7 @@ import { Editor, MarkdownView, Notice, Plugin, requestUrl } from 'obsidian';
 import { DEFAULT_SETTINGS, umbpublisherSettings } from "./types/index";
 import { SettingTab } from "./settings";
 import { umbpublisherIcons } from "./icons/icons";
-import { GetUmbracoDocType } from "./methods/getUmbracoDocType";
+import { GetUmbracoDocTypeById } from "./methods/getUmbracoDocType";
 import { CallUmbracoApi } from "./methods/callUmbracoApi";
 import { GenerateGuid } from 'methods/generateGuid';
 
@@ -39,7 +39,12 @@ export default class umbpublisher extends Plugin {
 			}
 			this.bearerToken = await this.getBearerToken();
 
-			const umbracoDocType = await GetUmbracoDocType(this.settings.blogDocTypeAlias, this.settings.websiteUrl, this.bearerToken);
+			const umbracoDocType = await GetUmbracoDocTypeById(this.settings.blogDocTypeId, this.settings.websiteUrl, this.bearerToken);
+			console.log('Document type fetched ICON:', umbracoDocType);
+			if (!umbracoDocType) {
+				new Notice('Failed to get document type. Please check your settings.');
+				return;
+			}
 			
 			await this.createObsidianNode(view, umbracoDocType, this.settings.websiteUrl);
 
@@ -61,7 +66,13 @@ export default class umbpublisher extends Plugin {
 				}
 				(async () => {
 				this.bearerToken = await this.getBearerToken();
-				const umbracoDocType = await GetUmbracoDocType(this.settings.blogDocTypeAlias, this.settings.websiteUrl, this.bearerToken);
+				const umbracoDocType = await GetUmbracoDocTypeById(this.settings.blogDocTypeId, this.settings.websiteUrl, this.bearerToken);
+				
+				if (!umbracoDocType) {
+					new Notice('Failed to get document type. Please check your settings.');
+					return;
+				}
+				
 				await this.createObsidianNode(view, umbracoDocType, this.settings.websiteUrl);
 				})();
 			}
@@ -175,34 +186,57 @@ export default class umbpublisher extends Plugin {
 	}
 
 	async createObsidianNode(view: MarkdownView, obsidianDoctype: any, websiteUrl: string): Promise<void> {
-		const endpoint = `${websiteUrl}/umbraco/management/api/v1/document`;
-		const nodeId = obsidianDoctype;
+		if (!obsidianDoctype) {
+			new Notice('Document type is null. Cannot create node.');
+			return;
+		}
 	
-		const pageTitle = await this.getLeafTitle();
-		const pageContent = await this.getPageContent(view);
+	const endpoint = `${websiteUrl}/umbraco/management/api/v1/document`;
+	const nodeId = obsidianDoctype.id;
+
+	const pageTitle = await this.getLeafTitle();
+	const pageContent = await this.getPageContent(view);
 	
+	// Debug logging
+	console.log('Page title:', pageTitle);
+	console.log('Page content:', pageContent);
+	console.log('Node ID:', nodeId);
+	
+	// Validate required data
+	if (!pageTitle) {
+		new Notice('Failed to get page title.');
+		return;
+	}
+	
+	if (!pageContent || !pageContent.content) {
+		new Notice('Failed to get page content.');
+		return;
+	}
+	
+	if (!nodeId) {
+		new Notice('Failed to get document type ID.');
+		return;
+	}		
 		const body = {
 			"id": await GenerateGuid(),
 			"parent": this.settings.blogParentNodeId ? { "id": this.settings.blogParentNodeId } : null,
 			"documentType":	{ "id": nodeId.id },
 			"template": null,
 			"values":
-				[
+			[
 					{
 						"editorAlias": "Umbraco.TextBox",
 						"alias": this.settings.titleAlias,
 						"culture": null,
 						"segment": null,
-						"value": pageTitle
+						"value": pageTitle || ""
 					},
 					{
-						"editorAias": "Umbraco.MarkdownEditor",
+						"editorAlias": "Umbraco.MarkdownEditor",
 						"alias": this.settings.blogContentAlias,
 						"culture": null,
 						"segment": null,
-						"value": pageContent?.content
-	
-	
+						"value": pageContent?.content || ""
 					}
 				],
 			"variants":
@@ -220,15 +254,17 @@ export default class umbpublisher extends Plugin {
 	
 		};
 	
+		var endpointWithId = endpoint+"/"+body.id;
 		const token = this.bearerToken;
 		
 		if (!token) {
 			new Notice('Bearer token is null. Please check your settings.');
 			return;
 		}
-	
+	    
 		try{
-			const response = await CallUmbracoApi(endpoint, token, 'POST', body);
+			const response = await CallUmbracoApi(endpointWithId, token, 'POST', body);
+			console.log('API response CREATE:', response);
 			if (response != null) {
 				new Notice('Node created successfully!');
 			} else {
