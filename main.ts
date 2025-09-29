@@ -216,44 +216,35 @@ export default class umbpublisher extends Plugin {
 		return;
 	}		
 		const body = {
+			"documentType": {
+				"id": nodeId
+			},
+			"template": null, // Set to null if no specific template, or { "id": "template-guid" } if needed
+			"values": [
+				{
+					"alias": this.settings.titleAlias,
+					"culture": null,
+					"segment": null,
+					"value": pageTitle || ""
+				},
+				{
+					"alias": this.settings.blogContentAlias,
+					"culture": null,
+					"segment": null,
+					"value": pageContent?.content || ""
+				}
+			],
+			"variants": [
+				{
+					"name": pageTitle,
+					"culture": null,
+					"segment": null
+				}
+			],
 			"id": await GenerateGuid(),
 			"parent": (this.settings.blogParentNodeId && this.settings.blogParentNodeId.trim() !== '' && this.settings.blogParentNodeId !== 'null') 
 				? { "id": this.settings.blogParentNodeId } 
-				: null,
-			"documentType":	{ "id": nodeId },
-			"template": null,
-			"values":
-			[
-					{
-						"alias": this.settings.titleAlias,
-						"culture": null,
-						"editorAlias": "Umbraco.TextBox",
-						"entityType": "document-property-value",
-						"segment": null,
-						"value": pageTitle || ""
-					},
-					{
-						"alias": this.settings.blogContentAlias,
-						"culture": null,
-						"editorAlias": "Umbraco.MarkdownEditor",
-						"entityType": "document-property-value",
-						"segment": null,
-						"value": pageContent?.content || ""
-					}
-				],
-			"variants":
-				[
-					{
-						"culture": null,
-						"segment": null,
-						"state": null,
-						"name": pageTitle,
-						"publishDate": null,
-						"createDate": null,
-						"updateDate": null
-					},
-				]
-
+				: null
 		};
 
 		console.log('Creating Umbraco node with:');
