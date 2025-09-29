@@ -192,15 +192,10 @@ export default class umbpublisher extends Plugin {
 		}
 	
 	const endpoint = `${websiteUrl}/umbraco/management/api/v1/document`;
-	const nodeId = obsidianDoctype.id;
+	const nodeId = obsidianDoctype;
 
 	const pageTitle = await this.getLeafTitle();
 	const pageContent = await this.getPageContent(view);
-	
-	// Debug logging
-	console.log('Page title:', pageTitle);
-	console.log('Page content:', pageContent);
-	console.log('Node ID:', nodeId);
 	
 	// Validate required data
 	if (!pageTitle) {
@@ -219,7 +214,7 @@ export default class umbpublisher extends Plugin {
 	}		
 		const body = {
 			"id": await GenerateGuid(),
-			"parent": { "id": this.settings.blogParentNodeId },
+			"parent": this.settings.blogParentNodeId ? { "id": this.settings.blogParentNodeId } : null,
 			"documentType":	{ "id": nodeId.id },
 			"template": null,
 			"values":
