@@ -219,22 +219,24 @@ export default class umbpublisher extends Plugin {
 	}		
 		const body = {
 			"id": await GenerateGuid(),
-			"parent": this.settings.blogParentNodeId ? { "id": this.settings.blogParentNodeId } : null,
+			"parent": { "id": this.settings.blogParentNodeId },
 			"documentType":	{ "id": nodeId.id },
 			"template": null,
 			"values":
 			[
 					{
-						"editorAlias": "Umbraco.TextBox",
 						"alias": this.settings.titleAlias,
 						"culture": null,
+						"editorAlias": "Umbraco.TextBox",
+						"entityType": "document-property-value",
 						"segment": null,
 						"value": pageTitle || ""
 					},
 					{
-						"editorAlias": "Umbraco.MarkdownEditor",
 						"alias": this.settings.blogContentAlias,
 						"culture": null,
+						"editorAlias": "Umbraco.MarkdownEditor",
+						"entityType": "document-property-value",
 						"segment": null,
 						"value": pageContent?.content || ""
 					}
