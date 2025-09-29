@@ -40,7 +40,7 @@ export async function GetUmbracoDocTypeById(docTypeId: string, websiteUrl: strin
             new Notice('Failed to fetch document type by ID.');
             return null;
         }
-
+        console.log('Document type fetched:', docTypeId, docTypeRaw);
         return docTypeRaw.json; // Return the document type details
 }
  

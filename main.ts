@@ -39,9 +39,11 @@ export default class umbpublisher extends Plugin {
 			}
 			this.bearerToken = await this.getBearerToken();
 			console.log('Blog DocType Id:', this.settings.blogDocTypeId);
-			
+
 			const umbracoDocType = await GetUmbracoDocTypeById(this.settings.blogDocTypeId, this.settings.websiteUrl, this.bearerToken);
 			
+			console.log('Document type fetched ICON:', umbracoDocType);
+
 			if (!umbracoDocType) {
 				new Notice('Failed to get document type. Please check your settings.');
 				return;
@@ -193,7 +195,7 @@ export default class umbpublisher extends Plugin {
 		}
 	
 	const endpoint = `${websiteUrl}/umbraco/management/api/v1/document`;
-	const nodeId = obsidianDoctype;
+	const nodeId = obsidianDoctype.id;
 
 	const pageTitle = await this.getLeafTitle();
 	const pageContent = await this.getPageContent(view);
@@ -216,7 +218,7 @@ export default class umbpublisher extends Plugin {
 		const body = {
 			"id": await GenerateGuid(),
 			"parent": this.settings.blogParentNodeId ? { "id": this.settings.blogParentNodeId } : null,
-			"documentType":	{ "id": nodeId.id },
+			"documentType":	{ "id": nodeId },
 			"template": null,
 			"values":
 			[
