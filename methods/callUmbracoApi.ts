@@ -7,8 +7,6 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 		new Notice('Bearer token is null. Please check your settings.');
 		return null;
 	}
-
-	console.log(`Calling Umbraco API: ${method} ${endpoint} with body:`, body);
 	
 	try{
 		const response = await requestUrl({
@@ -23,8 +21,7 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 		return response; // Return the parsed JSON response
 	}
 	catch (error) {
-		new Notice('Error in CallUmbracoApi: ' + error.message);
-		console.error('Error in CallUmbracoApi:', error);
+		new Notice('Error in CallUmbracoApi endpoint: ' + error.message);
 		return null;
 	}
 }

@@ -38,9 +38,10 @@ export default class umbpublisher extends Plugin {
 				return;
 			}
 			this.bearerToken = await this.getBearerToken();
-
+			console.log('Blog DocType Id:', this.settings.blogDocTypeId);
+			
 			const umbracoDocType = await GetUmbracoDocTypeById(this.settings.blogDocTypeId, this.settings.websiteUrl, this.bearerToken);
-			console.log('Document type fetched ICON:', umbracoDocType);
+			
 			if (!umbracoDocType) {
 				new Notice('Failed to get document type. Please check your settings.');
 				return;
