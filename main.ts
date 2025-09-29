@@ -256,7 +256,7 @@ export default class umbpublisher extends Plugin {
 	
 		};
 	
-		var endpointWithId = endpoint+"/"+body.id;
+		
 		const token = this.bearerToken;
 		
 		if (!token) {
@@ -265,8 +265,8 @@ export default class umbpublisher extends Plugin {
 		}
 	    
 		try{
-			const response = await CallUmbracoApi(endpointWithId, token, 'POST', body);
-			console.log('API response CREATE:', response);
+			const response = await CallUmbracoApi(endpoint, token, 'POST', body);
+		
 			if (response != null) {
 				new Notice('Node created successfully!');
 			} else {
