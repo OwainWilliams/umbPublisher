@@ -217,7 +217,9 @@ export default class umbpublisher extends Plugin {
 	}		
 		const body = {
 			"id": await GenerateGuid(),
-			"parent": this.settings.blogParentNodeId ? { "id": this.settings.blogParentNodeId } : null,
+			"parent": (this.settings.blogParentNodeId && this.settings.blogParentNodeId.trim() !== '' && this.settings.blogParentNodeId !== 'null') 
+				? { "id": this.settings.blogParentNodeId } 
+				: null,
 			"documentType":	{ "id": nodeId },
 			"template": null,
 			"values":
@@ -251,9 +253,14 @@ export default class umbpublisher extends Plugin {
 						"updateDate": null
 					},
 				]
-	
+
 		};
-	
+
+		console.log('Creating Umbraco node with:');
+		console.log('Endpoint:', endpoint);
+		console.log('Document Type ID:', nodeId);
+		console.log('Parent Node ID:', this.settings.blogParentNodeId);
+		console.log('Request Body:', JSON.stringify(body, null, 2));
 		
 		const token = this.bearerToken;
 		
@@ -266,14 +273,14 @@ export default class umbpublisher extends Plugin {
 			const response = await CallUmbracoApi(endpoint, token, 'POST', body);
 		
 			if (response != null) {
+				console.log('Node creation successful:', response);
 				new Notice('Node created successfully!');
 			} else {
-				new Notice('Failed to create node.');
+				new Notice('Failed to create node - no response received.');
 			}
 		}
 		catch (error) {
+			console.error('Error in createObsidianNode:', error);
 			new Notice('Error creating node: ' + error.message);
-		}
-		
-	}
+		}	}
 }
