@@ -269,22 +269,7 @@ export class SettingTab extends PluginSettingTab {
                 });
         }
 
-        new Setting(containerEl)
-				.setName('Blog parent node UUID')
-				.setDesc('For reference, this is fetched from the node picker above')
-				.addText(text => text
-					.setPlaceholder('Fetched from node picker above')
-					.setValue(this.plugin.settings.blogParentNodeId)
-					.setDisabled(true)
-					),
-			new Setting(containerEl)
-				.setName('DocType alias')
-				.setDesc('This is automatically populated from the selected child document type above')
-				.addText(text => text
-					.setPlaceholder('Select a child document type above')
-					.setValue(this.plugin.settings.blogDocTypeAlias)
-					.setDisabled(true)
-					),
+       
 			new Setting(containerEl)
 				.setName('Title alias')
 				.setDesc('This should be an Umbraco.TextString property on your page')
