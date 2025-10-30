@@ -1,7 +1,7 @@
 {
 	"id": "umbpublisher",
 	"name": "umbPublisher",
-	"version": "1.1.0",
+	"version": "1.2.0",
 	"minAppVersion": "1.9.12",
 	"description": "Push notes to Umbraco CMS as content.",
 	"author": "Owain Williams",
