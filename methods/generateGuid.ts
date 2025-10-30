@@ -6,11 +6,11 @@ const randomBytes = (size: number) => {
 };
 
 export async function GenerateGuid(): Promise<string> {
-	return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c: string) => {
-		const random = parseInt(c, 10) ^ (randomBytes(1)[0] & 15 >> parseInt(c, 10) / 4);
-		return random.toString(16); 
-
-	});
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
 }
 
 

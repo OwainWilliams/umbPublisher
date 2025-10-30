@@ -1,5 +1,6 @@
 import umbpublisher from "main";
 import { App, PluginSettingTab, Setting, requestUrl, Notice } from "obsidian";
+import { GetAllowedChildDocTypes, GetUmbracoDocTypeById } from "methods/getUmbracoDocType";
 
 async function getBearerToken(websiteUrl: string, clientId: string, clientSecret: string): Promise<string | null> {
     const tokenEndpoint = `${websiteUrl}/umbraco/management/api/v1/security/back-office/token`;
@@ -22,15 +23,6 @@ async function getBearerToken(websiteUrl: string, clientId: string, clientSecret
     }
 }
 
-async function fetchContentTree(websiteUrl: string, token: string): Promise<any[]> {
-    const endpoint = `${websiteUrl}/umbraco/management/api/v1/tree/document-type/root`;
-    const response = await requestUrl({
-        url: endpoint,
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` },
-    });
-    return (response.json as any).items || [];
-}
 
 // Recursively fetch all nodes and their children
 async function fetchAllContentNodes(
@@ -66,6 +58,7 @@ async function fetchAllContentNodes(
 export class SettingTab extends PluginSettingTab {
     plugin: umbpublisher;
     private cachedNodes: any[] = []; // Store fetched nodes
+    private cachedAllowedChildDocTypes: any[] = []; // Store fetched allowed child document types
 
     constructor(app: App, plugin: umbpublisher) {
         super(app, plugin);
@@ -161,30 +154,122 @@ export class SettingTab extends PluginSettingTab {
 
                 dropdown.onChange(async (value) => {
                     this.plugin.settings.blogParentNodeId = value;
-                    this.display();
                     await this.plugin.saveSettings();
                     
+                    // Refresh the display to show/hide the allowed child doc types dropdown
+                    this.display();
                 });
                 
-            }),
-                    new Setting(containerEl)
-				.setName('Blog parent node UUID')
-				.setDesc('For reference, this is fetched from the node picker above')
-				.addText(text => text
-					.setPlaceholder('Fetched from node picker above')
-					.setValue(this.plugin.settings.blogParentNodeId)
-					.setDisabled(true)
-					),
-			new Setting(containerEl)
-				.setName('DocType alias')
-				.setDesc('This is the alias of the DocType you want to use for your blog posts')
-				.addText(text => text
-					.setPlaceholder('Enter the DocType alias')
-					.setValue(this.plugin.settings.blogDocTypeAlias)
-					.onChange(async (value) => {
-						this.plugin.settings.blogDocTypeAlias = value;
-						await this.plugin.saveSettings();
-					})),
+            });
+
+        // Only show the allowed child document types dropdown if a parent node is selected
+        if (this.plugin.settings.blogParentNodeId) {
+            let childDocTypeDropdown: HTMLSelectElement | null = null;
+            let fetchChildDocTypesButton: HTMLButtonElement | null = null;
+
+            new Setting(containerEl)
+                .setName('Allowed child document types')
+                .setDesc('Select the document type for new content items')
+                .addButton(button => {
+                    fetchChildDocTypesButton = button.buttonEl;
+                    button.setButtonText('Fetch child doc types').onClick(async () => {
+                        const { websiteUrl, clientId, clientSecret, blogParentNodeId } = this.plugin.settings;
+                        if (!websiteUrl || !clientId || !clientSecret || !blogParentNodeId) {
+                            new Notice('Please ensure all required settings are configured.');
+                            return;
+                        }
+
+                        const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+                        if (!token) return;
+
+                        // Find the selected parent node to get its document type ID
+                        const selectedNode = this.cachedNodes.find(node => node.id === blogParentNodeId);
+                        if (!selectedNode) {
+                            new Notice('Selected parent node not found. Please re-fetch nodes.');
+                            return;
+                        }
+
+                        // Fetch allowed child document types
+                        this.cachedAllowedChildDocTypes = await GetAllowedChildDocTypes(
+                            selectedNode.documentType.id, 
+                            websiteUrl, 
+                            token
+                        );
+
+                        console.log('Fetched allowed child doc types:', this.cachedAllowedChildDocTypes);
+
+                        if (childDocTypeDropdown) {
+                            childDocTypeDropdown.innerHTML = '';
+                            const defaultOption = document.createElement('option');
+                            defaultOption.value = '';
+                            defaultOption.text = '[Select Document Type]';
+                            childDocTypeDropdown.appendChild(defaultOption);
+
+                            this.cachedAllowedChildDocTypes.forEach(docType => {
+                                const option = document.createElement('option');
+                                option.value = docType.id;
+                                option.text = docType.name;
+                                childDocTypeDropdown?.appendChild(option);
+                            });
+
+                            childDocTypeDropdown.value = this.plugin.settings.blogDocTypeId || '';
+                        }
+                    });
+                })
+                .addDropdown(dropdown => {
+                    childDocTypeDropdown = dropdown.selectEl;
+                    
+                    // Populate dropdown from cache if available
+                    childDocTypeDropdown.innerHTML = '';
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.text = '[Select Document Type]';
+                    childDocTypeDropdown.appendChild(defaultOption);
+
+                    if (this.cachedAllowedChildDocTypes.length > 0) {
+                        this.cachedAllowedChildDocTypes.forEach(docType => {
+                            const option = document.createElement('option');
+                            option.value = docType.id;
+                            option.text = docType.name;
+                            childDocTypeDropdown?.appendChild(option);
+                        });
+                    }
+
+                    childDocTypeDropdown.value = this.plugin.settings.blogDocTypeId || '';
+
+                    dropdown.onChange(async (value) => {
+                        console.log('Document type dropdown changed:', value);
+                        
+                        if (value) {
+                            // Get the bearer token
+                            const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
+                            const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+                            
+                            if (token) {
+                                // Fetch the full document type details to get the alias
+                                const docTypeDetails = await GetUmbracoDocTypeById(value, websiteUrl, token);
+                                console.log('Document type details:', docTypeDetails);
+                                
+                                if (docTypeDetails) {
+                                    this.plugin.settings.blogDocTypeId = docTypeDetails.id;
+                                    this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
+                                    console.log('Updated settings:', this.plugin.settings.blogDocTypeId, this.plugin.settings.blogDocTypeAlias);
+                                }
+                            }
+                        } else {
+                            this.plugin.settings.blogDocTypeId = '';
+                            this.plugin.settings.blogDocTypeAlias = '';
+                        }
+                        
+                        await this.plugin.saveSettings();
+                        
+                        // Refresh the display to update the DocType alias field
+                        this.display();
+                    });
+                });
+        }
+
+       
 			new Setting(containerEl)
 				.setName('Title alias')
 				.setDesc('This should be an Umbraco.TextString property on your page')
