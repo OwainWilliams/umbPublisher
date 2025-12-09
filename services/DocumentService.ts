@@ -1,6 +1,7 @@
 import { UmbracoApiService } from './UmbracoApiService';
+import { MediaService } from './MediaService';
 import { GenerateGuid } from '../methods/generateGuid';
-import { Notice } from 'obsidian';
+import { Notice, TFile, App } from 'obsidian';
 
 export interface CreateDocumentRequest {
     id: string;
@@ -29,7 +30,72 @@ export interface CreateDocumentRequest {
 }
 
 export class DocumentService {
-    constructor(private apiService: UmbracoApiService) {}
+    private mediaService: MediaService;
+
+    constructor(private apiService: UmbracoApiService, private app: App) {
+        this.mediaService = new MediaService(apiService);
+    }
+
+    async processImagesInContent(content: string, vault: any): Promise<{ content: string; uploadedImages: string[] }> {
+        const imageRegex = /!\[\[([^\]]+)\]\]/g;
+        const uploadedImages: string[] = [];
+        let processedContent = content;
+
+        const matches = Array.from(content.matchAll(imageRegex));
+        
+        console.log('DocumentService: Found', matches.length, 'images to process');
+        
+        for (const match of matches) {
+            const imageName = match[1];
+            console.log('DocumentService: Processing image:', imageName);
+
+            try {
+                // Get all files in the vault to find the image
+                const files = vault.getFiles();
+                const imageFile = files.find((f: any) => 
+                    f.name === imageName || 
+                    f.path === imageName ||
+                    f.path.endsWith('/' + imageName)
+                );
+                
+                if (!imageFile) {
+                    console.warn('DocumentService: Image file not found:', imageName);
+                    continue;
+                }
+
+                console.log('DocumentService: Found image file:', imageFile.path);
+
+                const arrayBuffer = await vault.adapter.readBinary(imageFile.path);
+                const fileName = imageFile.name;
+                
+                console.log('DocumentService: Read image data, size:', arrayBuffer.byteLength);
+                
+                const obsidianFolderId = await this.mediaService.getOrCreateObsidianFolder();
+                const mediaId = await this.mediaService.uploadImage(arrayBuffer, fileName, obsidianFolderId);
+                
+                console.log('DocumentService: Uploaded image, media ID:', mediaId);
+                
+                // Get the media URL
+                const mediaUrl = await this.mediaService.getMediaUrl(mediaId);
+                
+                console.log('DocumentService: Got media URL:', mediaUrl);
+                
+                uploadedImages.push(mediaId);
+                
+                // Replace markdown image with HTML img tag using the media URL
+                const replacement = `<img src="${mediaUrl}" alt="${imageName}" />`;
+                processedContent = processedContent.replace(match[0], replacement);
+                
+                console.log('DocumentService: Replaced', match[0], 'with', replacement);
+                
+            } catch (error) {
+                console.error('DocumentService: Error processing image', imageName, error);
+            }
+        }
+
+        console.log('DocumentService: Processed content:', processedContent.substring(0, 200));
+        return { content: processedContent, uploadedImages };
+    }
 
     async createDocument(
         docTypeId: string,
@@ -37,8 +103,19 @@ export class DocumentService {
         content: string,
         parentId: string | null,
         titleAlias: string,
-        contentAlias: string
+        contentAlias: string,
+        sourceFile?: TFile
     ): Promise<any> {
+        // Process images if source file is provided
+        let processedContent = content;
+        if (sourceFile) {
+            console.log('Processing images in content...');
+            // Pass the app.vault instead of sourceFile
+            const { content: processed } = await this.processImagesInContent(content, this.app.vault);
+            processedContent = processed;
+            console.log('Images processed. Content length:', processedContent.length);
+        }
+
         const documentId = await GenerateGuid();
         
         // First, get the document type details to understand the property structure
@@ -95,7 +172,7 @@ export class DocumentService {
             values.push({
                 editorAlias: 'Umbraco.MarkdownEditor',
                 alias: contentAlias,
-                value: content || "",
+                value: processedContent || "",
                 culture: null,
                 segment: null
             });
@@ -113,7 +190,7 @@ export class DocumentService {
             values.push({
                 editorAlias: contentProperty.dataType?.editorAlias || 'Umbraco.MarkdownEditor',
                 alias: contentAlias,
-                value: content || "",
+                value: processedContent || "",
                 culture: null,
                 segment: null
             });
