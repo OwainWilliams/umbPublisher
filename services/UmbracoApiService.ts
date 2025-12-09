@@ -228,7 +228,7 @@ export class UmbracoApiService {
 
             const response = await requestUrl({
                 url,
-                method: 'POST',
+                method: 'PUT',  // Changed from POST to PUT
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': mimeType

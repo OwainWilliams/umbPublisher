@@ -1,9 +1,9 @@
 import { UmbracoApiService } from './UmbracoApiService';
 import { GenerateGuid } from '../methods/generateGuid';
-import { requestUrl } from 'obsidian';
 
 export class MediaService {
     private folderMediaTypeId: string | null = null;
+    private imageMediaTypeId: string | null = null;
     private obsidianFolderId: string | null = null;
 
     constructor(private apiService: UmbracoApiService) {}
@@ -30,6 +30,45 @@ export class MediaService {
         console.log('MediaService: Found folder media type ID:', folderType.id);
         this.folderMediaTypeId = folderType.id;
         return folderType.id;
+    }
+
+    async getImageMediaTypeId(): Promise<string> {
+        if (this.imageMediaTypeId) {
+            return this.imageMediaTypeId;
+        }
+
+        console.log('MediaService: Getting Image media type ID...');
+        
+        // Try to get from allowed types in a folder first
+        try {
+            const folderMediaTypeId = await this.getFolderMediaTypeId();
+            const allowedInFolder = await this.apiService.callApi(
+                `/umbraco/management/api/v1/media-type/${folderMediaTypeId}/allowed-children`
+            ) as { items: Array<{ id: string; name: string }> };
+            
+            const imageType = allowedInFolder.items.find(item => item.name === 'Image');
+            if (imageType) {
+                console.log('MediaService: Image media type ID:', imageType.id);
+                this.imageMediaTypeId = imageType.id;
+                return imageType.id;
+            }
+        } catch (error) {
+            console.log('MediaService: Could not get from allowed children, trying full list...');
+        }
+        
+        // Fallback: get all media types with pagination
+        const mediaTypes = await this.apiService.callApi(
+            '/umbraco/management/api/v1/media-type?skip=0&take=100'
+        ) as { items: Array<{ id: string; name: string }> };
+        
+        const imageType = mediaTypes.items.find(item => item.name === 'Image');
+        if (!imageType) {
+            throw new Error('Image media type not found');
+        }
+        
+        console.log('MediaService: Image media type ID:', imageType.id);
+        this.imageMediaTypeId = imageType.id;
+        return imageType.id;
     }
 
     async getOrCreateObsidianFolder(): Promise<string> {
@@ -131,73 +170,51 @@ export class MediaService {
     ): Promise<string> {
         try {
             console.log('MediaService: Starting image upload for:', fileName);
-            console.log('MediaService: Image size:', imageData.byteLength, 'bytes');
-            console.log('MediaService: Parent folder ID:', parentFolderId);
             
             // Step 1: Upload to temporary file storage
-            console.log('MediaService: Uploading to temporary file storage...');
-            const tempFileId = await this.uploadTemporaryFile(imageData, fileName);
-            console.log('MediaService: Temporary file uploaded with ID:', tempFileId);
+            const temporaryFileId = await this.uploadTemporaryFile(imageData, fileName);
+            console.log('MediaService: Temporary file ID:', temporaryFileId);
             
-            // Step 2: Create media item referencing the temporary file
-            const mediaId = await GenerateGuid();
-            console.log('MediaService: Generated media ID:', mediaId);
+            // Step 2: Get the Image media type ID (cached)
+            const imageTypeId = await this.getImageMediaTypeId();
             
-            const createPayload = {
-                id: mediaId,
+            // Step 3: Create permanent media item from temporary file
+            console.log('MediaService: Creating permanent media item...');
+            const mediaKey = await GenerateGuid();
+            
+            const createMediaPayload = {
+                id: mediaKey,
                 parent: { id: parentFolderId },
-                mediaType: {
-                    id: 'cc07b313-0843-4aa8-bbda-871c8da728c8' // Image media type
-                },
+                mediaType: { id: imageTypeId },
                 values: [
                     {
                         alias: 'umbracoFile',
                         value: {
-                            id: tempFileId
-                        },
-                        culture: null,
-                        segment: null
+                            temporaryFileId: temporaryFileId
+                        }
                     }
                 ],
                 variants: [
                     {
                         culture: null,
                         segment: null,
-                        name: fileName.substring(0, fileName.lastIndexOf('.'))
+                        name: fileName
                     }
                 ]
             };
-
-            console.log('MediaService: Creating media with payload:', JSON.stringify(createPayload, null, 2));
-
-            const created = await this.apiService.callApi(
+            
+            console.log('MediaService: Create media payload:', JSON.stringify(createMediaPayload, null, 2));
+            
+            const result = await this.apiService.callApi(
                 '/umbraco/management/api/v1/media',
                 'POST',
-                createPayload
+                createMediaPayload
             );
-
-            console.log('MediaService: Media creation response:', JSON.stringify(created, null, 2));
             
-            const createdId = (created as any)?.id || mediaId;
-            console.log('MediaService: Media created with ID:', createdId);
-
-            // Step 3: Get the media URL
-            const media = await this.apiService.callApi(
-                `/umbraco/management/api/v1/media/${createdId}`
-            ) as any;
-
-            console.log('MediaService: Retrieved media details:', JSON.stringify(media, null, 2));
-
-            // Extract URL from umbracoFile property
-            const umbracoFile = media.values?.find((v: any) => v.alias === 'umbracoFile');
-            if (umbracoFile && umbracoFile.value) {
-                // The URL could be in different locations
-                const url = umbracoFile.value.src || umbracoFile.value.url || umbracoFile.value;
-                console.log('MediaService: Image uploaded successfully, URL:', url);
-                return url;
-            }
-
-            throw new Error('Could not retrieve media URL from response');
+            console.log('MediaService: Media item created:', result);
+            console.log('MediaService: Image uploaded successfully with ID:', mediaKey);
+            
+            return mediaKey;
         } catch (error) {
             console.error('MediaService: Error uploading image:', error);
             throw error;
@@ -209,33 +226,44 @@ export class MediaService {
             console.log('MediaService: Uploading temporary file:', fileName);
             console.log('MediaService: Image data size:', imageData.byteLength);
             
-            // Generate a unique key for this upload
-            const uniqueKey = await GenerateGuid();
-            console.log('MediaService: Generated unique key:', uniqueKey);
-            
             const extension = fileName.substring(fileName.lastIndexOf('.'));
             const mimeType = this.getMimeType(extension);
             console.log('MediaService: MIME type:', mimeType);
             
-            // Single step: Upload with both id and file in multipart form-data
-            console.log('MediaService: Uploading temporary file with ID and file...');
+            // Generate a unique ID for this temporary file
+            const tempFileId = await GenerateGuid();
+            console.log('MediaService: Generated temp file ID:', tempFileId);
+            
+            // Use the existing uploadFile method from apiService
+            const endpoint = `/umbraco/management/api/v1/temporary-file?id=${tempFileId}`;
+            
             const result = await this.apiService.uploadFile(
-                '/umbraco/management/api/v1/temporary-file',
+                endpoint,
                 imageData,
                 fileName,
                 mimeType,
-                uniqueKey  // Pass the ID
+                tempFileId
             );
 
             console.log('MediaService: Upload result:', JSON.stringify(result, null, 2));
-            console.log('MediaService: Temporary file uploaded successfully with ID:', uniqueKey);
             
-            // Return the key we generated
-            return uniqueKey;
+            // Return the temp file ID we generated
+            console.log('MediaService: Temporary file uploaded successfully with ID:', tempFileId);
+            return tempFileId;
         } catch (error) {
             console.error('MediaService: Error uploading temporary file:', error);
             throw error;
         }
+    }
+
+    private async uploadFileMultipart(
+        endpoint: string,
+        fileData: ArrayBuffer,
+        fileName: string,
+        mimeType: string
+    ): Promise<any> {
+        // This method is no longer used - keeping for backwards compatibility
+        throw new Error('uploadFileMultipart is deprecated - use uploadTemporaryFile directly');
     }
 
     private getMimeType(extension: string): string {
@@ -253,76 +281,6 @@ export class MediaService {
                 return 'image/svg+xml';
             default:
                 return 'application/octet-stream';
-        }
-    }
-
-    async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string): Promise<any> {
-        console.log('=== Upload File Debug ===');
-        console.log('this.baseUrl:', (this.apiService as any).baseUrl);
-        console.log('typeof this.baseUrl:', typeof (this.apiService as any).baseUrl);
-        console.log('endpoint:', endpoint);
-        
-        const url = `${(this.apiService as any).baseUrl}${endpoint}`;
-        console.log('Constructed URL:', url);
-        console.log('typeof url:', typeof url);
-        
-        // Validate URL format
-        try {
-            new URL(url);
-            console.log('URL is valid');
-        } catch (urlError) {
-            console.error('URL validation failed:', urlError);
-            console.error('URL parts - baseUrl:', (this.apiService as any).baseUrl, 'endpoint:', endpoint);
-            throw new Error(`Invalid URL constructed: ${url}`);
-        }
-        
-        console.log(`File name: ${fileName}`);
-        console.log(`MIME type: ${mimeType}`);
-        
-        try {
-            // Convert ArrayBuffer to Blob
-            const blob = new Blob([fileData], { type: mimeType });
-            
-            // Create FormData
-            const formData = new FormData();
-            formData.append('file', blob, fileName);
-
-            console.log('Making fetch request to:', url);
-
-            // Use native fetch API
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Api-Key': (this.apiService as any).apiKey
-                },
-                body: formData
-            });
-
-            console.log('Response status:', response.status);
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                const errorMessage = `HTTP ${response.status}: ${errorText}`;
-                console.error('API call failed:', {
-                    endpoint,
-                    method: 'POST',
-                    status: response.status,
-                    error: errorMessage
-                });
-                throw new Error(errorMessage);
-            }
-
-            const result = await response.json();
-            console.log('File upload successful:', result);
-            return result;
-        } catch (error) {
-            console.error('API call failed:', {
-                endpoint,
-                method: 'POST',
-                status: 'unknown',
-                error: error instanceof Error ? error.message : String(error)
-            });
-            throw error;
         }
     }
 }
