@@ -1,6 +1,7 @@
 import { UmbracoApiService } from './UmbracoApiService';
+import { MediaService } from './MediaService';
 import { GenerateGuid } from '../methods/generateGuid';
-import { Notice } from 'obsidian';
+import { Notice, TFile, App } from 'obsidian';
 
 export interface CreateDocumentRequest {
     id: string;
@@ -29,7 +30,129 @@ export interface CreateDocumentRequest {
 }
 
 export class DocumentService {
-    constructor(private apiService: UmbracoApiService) {}
+    private mediaService: MediaService;
+
+    constructor(private apiService: UmbracoApiService, private app: App) {
+        this.mediaService = new MediaService(apiService);
+    }
+
+    async processImagesInContent(content: string, sourceFile: TFile): Promise<string> {
+        console.log('DocumentService: Starting image processing');
+        console.log('DocumentService: Content length:', content.length);
+        
+        // Find both markdown and wiki-style images
+        // Markdown: ![alt](path)
+        // Wiki: ![[path]] or ![[path|alt]]
+        const markdownPattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
+        const wikiPattern = /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+        
+        const markdownMatches = Array.from(content.matchAll(markdownPattern));
+        const wikiMatches = Array.from(content.matchAll(wikiPattern));
+        
+        console.log(`DocumentService: Found ${markdownMatches.length} markdown-style images`);
+        console.log(`DocumentService: Found ${wikiMatches.length} wiki-style images`);
+        
+        if (markdownMatches.length === 0 && wikiMatches.length === 0) {
+            console.log('DocumentService: No images found in content');
+            return content;
+        }
+
+        // Get or create Obsidian folder
+        const folderId = await this.mediaService.getOrCreateObsidianFolder();
+        
+        let updatedContent = content;
+        
+        // Process markdown-style images
+        for (const match of markdownMatches) {
+            const fullMatch = match[0];
+            const altText = match[1];
+            const imagePath = match[2];
+            
+            console.log(`DocumentService: Processing markdown image - Alt: "${altText}", Path: "${imagePath}"`);
+            
+            // Skip if already a URL
+            if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+                console.log(`DocumentService: Skipping external URL: ${imagePath}`);
+                continue;
+            }
+
+            try {
+                const imageFile = this.app.metadataCache.getFirstLinkpathDest(
+                    imagePath,
+                    sourceFile.path
+                );
+
+                if (!imageFile) {
+                    console.warn(`DocumentService: Image not found: ${imagePath}`);
+                    continue;
+                }
+
+                console.log(`DocumentService: Found image file: ${imageFile.path}`);
+                
+                const imageData = await this.app.vault.readBinary(imageFile);
+                console.log(`DocumentService: Read ${imageData.byteLength} bytes from ${imageFile.name}`);
+                
+                const mediaUrl = await this.mediaService.uploadImage(
+                    imageData,
+                    imageFile.name,
+                    folderId
+                );
+
+                updatedContent = updatedContent.replace(
+                    fullMatch,
+                    `![${altText}](${mediaUrl})`
+                );
+
+                console.log(`DocumentService: Replaced ${imagePath} with ${mediaUrl}`);
+            } catch (error) {
+                console.error(`DocumentService: Error processing image ${imagePath}:`, error);
+            }
+        }
+        
+        // Process wiki-style images
+        for (const match of wikiMatches) {
+            const fullMatch = match[0];
+            const imagePath = match[1];
+            const altText = match[2] || ''; // Alt text is optional in wiki syntax
+            
+            console.log(`DocumentService: Processing wiki image - Alt: "${altText}", Path: "${imagePath}"`);
+
+            try {
+                const imageFile = this.app.metadataCache.getFirstLinkpathDest(
+                    imagePath,
+                    sourceFile.path
+                );
+
+                if (!imageFile) {
+                    console.warn(`DocumentService: Image not found: ${imagePath}`);
+                    continue;
+                }
+
+                console.log(`DocumentService: Found image file: ${imageFile.path}`);
+                
+                const imageData = await this.app.vault.readBinary(imageFile);
+                console.log(`DocumentService: Read ${imageData.byteLength} bytes from ${imageFile.name}`);
+                
+                const mediaUrl = await this.mediaService.uploadImage(
+                    imageData,
+                    imageFile.name,
+                    folderId
+                );
+
+                // Convert wiki syntax to markdown with Umbraco URL
+                updatedContent = updatedContent.replace(
+                    fullMatch,
+                    `![${altText}](${mediaUrl})`
+                );
+
+                console.log(`DocumentService: Replaced ${imagePath} with ${mediaUrl}`);
+            } catch (error) {
+                console.error(`DocumentService: Error processing image ${imagePath}:`, error);
+            }
+        }
+
+        return updatedContent;
+    }
 
     async createDocument(
         docTypeId: string,
@@ -37,8 +160,16 @@ export class DocumentService {
         content: string,
         parentId: string | null,
         titleAlias: string,
-        contentAlias: string
+        contentAlias: string,
+        sourceFile?: TFile
     ): Promise<any> {
+        // Process images if source file is provided
+        let processedContent = content;
+        if (sourceFile) {
+            console.log('Processing images in content...');
+            processedContent = await this.processImagesInContent(content, sourceFile);
+        }
+
         const documentId = await GenerateGuid();
         
         // First, get the document type details to understand the property structure
@@ -95,7 +226,7 @@ export class DocumentService {
             values.push({
                 editorAlias: 'Umbraco.MarkdownEditor',
                 alias: contentAlias,
-                value: content || "",
+                value: processedContent || "",
                 culture: null,
                 segment: null
             });
@@ -113,7 +244,7 @@ export class DocumentService {
             values.push({
                 editorAlias: contentProperty.dataType?.editorAlias || 'Umbraco.MarkdownEditor',
                 alias: contentAlias,
-                value: content || "",
+                value: processedContent || "",
                 culture: null,
                 segment: null
             });

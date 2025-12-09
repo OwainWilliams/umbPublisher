@@ -11,6 +11,7 @@ import { ErrorHandler } from './services/ErrorHandler';
 import { SettingsValidator } from './services/SettingsValidator';
 import { GetUmbracoDocTypeById } from "./methods/getUmbracoDocType";
 
+
 export default class umbpublisher extends Plugin {
     settings: umbpublisherSettings;
     private icons = new umbpublisherIcons();
@@ -44,7 +45,7 @@ export default class umbpublisher extends Plugin {
                 this.settings.clientId,
                 this.settings.clientSecret
             );
-            this.documentService = new DocumentService(this.apiService);
+            this.documentService = new DocumentService(this.apiService, this.app);
         }
         this.contentParser = new ContentParser(this.app);
     }
@@ -116,14 +117,22 @@ export default class umbpublisher extends Plugin {
 
             console.log('Parsed content:', { title, contentLength: content.content.length });
 
-            // Create document
+            // Get the current file
+            const currentFile = view.file;
+            if (!currentFile) {
+                new Notice('Could not access current file.');
+                return;
+            }
+
+            // Create document with source file for image processing
             await this.documentService.createDocument(
                 docType.id,
                 title,
                 content.content,
                 this.settings.blogParentNodeId,
                 this.settings.titleAlias,
-                this.settings.blogContentAlias
+                this.settings.blogContentAlias,
+                currentFile  // Pass the file here
             );
 
             new Notice('Document created successfully!');

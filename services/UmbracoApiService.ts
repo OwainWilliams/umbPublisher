@@ -118,6 +118,151 @@ export class UmbracoApiService {
         }
     }
 
+    async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string, id?: string): Promise<any> {
+        const token = await this.getBearerToken();
+        if (!token) throw new Error('Failed to get bearer token');
+
+        const url = `${this.websiteUrl}${endpoint}`;
+        
+        try {
+            // Create a proper boundary
+            const boundary = '----ObsidianFormBoundary' + Date.now().toString(16);
+            
+            // Build multipart form data with proper CRLF line endings
+            const CRLF = '\r\n';
+            const encoder = new TextEncoder();
+            
+            let bodyParts: Uint8Array[] = [];
+            
+            // Add id field if provided
+            if (id) {
+                let idPart = '';
+                idPart += `--${boundary}${CRLF}`;
+                idPart += `Content-Disposition: form-data; name="id"${CRLF}`;
+                idPart += CRLF;
+                idPart += id;
+                idPart += CRLF;
+                bodyParts.push(encoder.encode(idPart));
+            }
+            
+            // Add file field
+            let filePart = '';
+            filePart += `--${boundary}${CRLF}`;
+            filePart += `Content-Disposition: form-data; name="file"; filename="${fileName}"${CRLF}`;
+            filePart += `Content-Type: ${mimeType}${CRLF}`;
+            filePart += CRLF;
+            
+            bodyParts.push(encoder.encode(filePart));
+            bodyParts.push(new Uint8Array(fileData));
+            
+            // Add closing boundary
+            const footer = `${CRLF}--${boundary}--${CRLF}`;
+            bodyParts.push(encoder.encode(footer));
+            
+            // Combine all parts
+            const totalLength = bodyParts.reduce((sum, part) => sum + part.length, 0);
+            const fullBody = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const part of bodyParts) {
+                fullBody.set(part, offset);
+                offset += part.length;
+            }
+
+            console.log('Upload URL:', url);
+            console.log('Boundary:', boundary);
+            console.log('ID:', id);
+            console.log('File size:', fileData.byteLength);
+            console.log('Total body size:', fullBody.length);
+            
+            // Debug: show first 300 bytes
+            const preview = new TextDecoder().decode(fullBody.slice(0, 300));
+            console.log('Body preview:', preview);
+
+            const response = await requestUrl({
+                url,
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': `multipart/form-data; boundary=${boundary}`
+                },
+                body: fullBody.buffer,
+                throw: false
+            });
+
+            console.log('Upload response status:', response.status);
+            console.log('Upload response text:', response.text);
+
+            if (response.status < 200 || response.status >= 300) {
+                throw new Error(`HTTP ${response.status}: ${response.text}`);
+            }
+
+            // Handle empty or non-JSON responses
+            if (!response.text || response.text.trim() === '') {
+                console.log('Empty response received - file uploaded successfully');
+                return { success: true, status: response.status };
+            }
+
+            // Try to parse JSON if there's content
+            try {
+                return JSON.parse(response.text);
+            } catch (jsonError) {
+                console.log('Non-JSON response received:', response.text);
+                return { success: true, status: response.status, rawResponse: response.text };
+            }
+        } catch (error) {
+            console.error('File upload failed:', error);
+            throw error;
+        }
+    }
+
+    async uploadBinary(endpoint: string, fileData: ArrayBuffer, mimeType: string): Promise<any> {
+        const token = await this.getBearerToken();
+        if (!token) throw new Error('Failed to get bearer token');
+
+        const url = `${this.websiteUrl}${endpoint}`;
+        
+        try {
+            console.log('Uploading binary to:', url);
+            console.log('Content-Type:', mimeType);
+            console.log('Data size:', fileData.byteLength);
+
+            const response = await requestUrl({
+                url,
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': mimeType
+                },
+                body: fileData,
+                throw: false
+            });
+
+            console.log('Binary upload response status:', response.status);
+            console.log('Binary upload response text:', response.text);
+
+            if (response.status < 200 || response.status >= 300) {
+                throw new Error(`HTTP ${response.status}: ${response.text}`);
+            }
+
+            // Handle empty or non-JSON responses
+            if (!response.text || response.text.trim() === '') {
+                console.log('Empty response received - binary uploaded successfully');
+                return { success: true, status: response.status };
+            }
+
+            // Try to parse JSON if there's content
+            try {
+                return JSON.parse(response.text);
+            } catch (jsonError) {
+                console.log('Non-JSON response received:', response.text);
+                return { success: true, status: response.status, rawResponse: response.text };
+            }
+        } catch (error) {
+            console.error('Binary upload failed:', error);
+            throw error;
+        }
+    }
+
     clearToken(): void {
         this.bearerToken = null;
     }
