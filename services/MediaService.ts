@@ -171,6 +171,13 @@ export class MediaService {
         try {
             console.log('MediaService: Starting image upload for:', fileName);
             
+            // Check if image already exists in the folder
+            const existingMedia = await this.findMediaByName(fileName, parentFolderId);
+            if (existingMedia) {
+                console.log('MediaService: Image already exists with ID:', existingMedia);
+                return existingMedia;
+            }
+            
             // Step 1: Upload to temporary file storage
             const temporaryFileId = await this.uploadTemporaryFile(imageData, fileName);
             console.log('MediaService: Temporary file ID:', temporaryFileId);
@@ -205,18 +212,44 @@ export class MediaService {
             
             console.log('MediaService: Create media payload:', JSON.stringify(createMediaPayload, null, 2));
             
-            const result = await this.apiService.callApi(
+            await this.apiService.callApi(
                 '/umbraco/management/api/v1/media',
                 'POST',
                 createMediaPayload
             );
             
-            console.log('MediaService: Media item created:', result);
-            console.log('MediaService: Image uploaded successfully with ID:', mediaKey);
+            console.log('MediaService: Media item created with ID:', mediaKey);
+            console.log('MediaService: Image uploaded successfully');
             
             return mediaKey;
         } catch (error) {
             console.error('MediaService: Error uploading image:', error);
+            throw error;
+        }
+    }
+
+    async getMediaUrl(mediaId: string): Promise<string> {
+        try {
+            console.log('MediaService: Getting media URL for ID:', mediaId);
+            
+            const media = await this.apiService.callApi(
+                `/umbraco/management/api/v1/media/${mediaId}`
+            ) as any;
+            
+            console.log('MediaService: Media details:', JSON.stringify(media, null, 2));
+            
+            // Extract URL from umbracoFile property
+            const umbracoFile = media?.values?.find((v: any) => v.alias === 'umbracoFile');
+            const url = umbracoFile?.value?.src || umbracoFile?.value?.url;
+            
+            if (!url) {
+                throw new Error('Could not find media URL in response');
+            }
+            
+            console.log('MediaService: Media URL:', url);
+            return url;
+        } catch (error) {
+            console.error('MediaService: Error getting media URL:', error);
             throw error;
         }
     }
@@ -281,6 +314,32 @@ export class MediaService {
                 return 'image/svg+xml';
             default:
                 return 'application/octet-stream';
+        }
+    }
+
+    private async findMediaByName(fileName: string, parentFolderId: string): Promise<string | null> {
+        try {
+            console.log('MediaService: Searching for existing media:', fileName);
+            
+            const response = await this.apiService.callApi(
+                `/umbraco/management/api/v1/tree/media/children?parentId=${parentFolderId}`
+            ) as { items?: any[] };
+            
+            if (response && response.items) {
+                const existing = response.items.find((item: any) => 
+                    item.name === fileName || item.variants?.[0]?.name === fileName
+                );
+                
+                if (existing) {
+                    console.log('MediaService: Found existing media with ID:', existing.id);
+                    return existing.id;
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('MediaService: Error finding media by name:', error);
+            return null;
         }
     }
 }

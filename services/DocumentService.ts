@@ -36,122 +36,65 @@ export class DocumentService {
         this.mediaService = new MediaService(apiService);
     }
 
-    async processImagesInContent(content: string, sourceFile: TFile): Promise<string> {
-        console.log('DocumentService: Starting image processing');
-        console.log('DocumentService: Content length:', content.length);
-        
-        // Find both markdown and wiki-style images
-        // Markdown: ![alt](path)
-        // Wiki: ![[path]] or ![[path|alt]]
-        const markdownPattern = /!\[([^\]]*)\]\(([^)]+)\)/g;
-        const wikiPattern = /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
-        
-        const markdownMatches = Array.from(content.matchAll(markdownPattern));
-        const wikiMatches = Array.from(content.matchAll(wikiPattern));
-        
-        console.log(`DocumentService: Found ${markdownMatches.length} markdown-style images`);
-        console.log(`DocumentService: Found ${wikiMatches.length} wiki-style images`);
-        
-        if (markdownMatches.length === 0 && wikiMatches.length === 0) {
-            console.log('DocumentService: No images found in content');
-            return content;
-        }
+    async processImagesInContent(content: string, vault: any): Promise<{ content: string; uploadedImages: string[] }> {
+        const imageRegex = /!\[\[([^\]]+)\]\]/g;
+        const uploadedImages: string[] = [];
+        let processedContent = content;
 
-        // Get or create Obsidian folder
-        const folderId = await this.mediaService.getOrCreateObsidianFolder();
+        const matches = Array.from(content.matchAll(imageRegex));
         
-        let updatedContent = content;
+        console.log('DocumentService: Found', matches.length, 'images to process');
         
-        // Process markdown-style images
-        for (const match of markdownMatches) {
-            const fullMatch = match[0];
-            const altText = match[1];
-            const imagePath = match[2];
-            
-            console.log(`DocumentService: Processing markdown image - Alt: "${altText}", Path: "${imagePath}"`);
-            
-            // Skip if already a URL
-            if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-                console.log(`DocumentService: Skipping external URL: ${imagePath}`);
-                continue;
-            }
+        for (const match of matches) {
+            const imageName = match[1];
+            console.log('DocumentService: Processing image:', imageName);
 
             try {
-                const imageFile = this.app.metadataCache.getFirstLinkpathDest(
-                    imagePath,
-                    sourceFile.path
+                // Get all files in the vault to find the image
+                const files = vault.getFiles();
+                const imageFile = files.find((f: any) => 
+                    f.name === imageName || 
+                    f.path === imageName ||
+                    f.path.endsWith('/' + imageName)
                 );
-
+                
                 if (!imageFile) {
-                    console.warn(`DocumentService: Image not found: ${imagePath}`);
+                    console.warn('DocumentService: Image file not found:', imageName);
                     continue;
                 }
 
-                console.log(`DocumentService: Found image file: ${imageFile.path}`);
-                
-                const imageData = await this.app.vault.readBinary(imageFile);
-                console.log(`DocumentService: Read ${imageData.byteLength} bytes from ${imageFile.name}`);
-                
-                const mediaUrl = await this.mediaService.uploadImage(
-                    imageData,
-                    imageFile.name,
-                    folderId
-                );
+                console.log('DocumentService: Found image file:', imageFile.path);
 
-                updatedContent = updatedContent.replace(
-                    fullMatch,
-                    `![${altText}](${mediaUrl})`
-                );
-
-                console.log(`DocumentService: Replaced ${imagePath} with ${mediaUrl}`);
+                const arrayBuffer = await vault.adapter.readBinary(imageFile.path);
+                const fileName = imageFile.name;
+                
+                console.log('DocumentService: Read image data, size:', arrayBuffer.byteLength);
+                
+                const obsidianFolderId = await this.mediaService.getOrCreateObsidianFolder();
+                const mediaId = await this.mediaService.uploadImage(arrayBuffer, fileName, obsidianFolderId);
+                
+                console.log('DocumentService: Uploaded image, media ID:', mediaId);
+                
+                // Get the media URL
+                const mediaUrl = await this.mediaService.getMediaUrl(mediaId);
+                
+                console.log('DocumentService: Got media URL:', mediaUrl);
+                
+                uploadedImages.push(mediaId);
+                
+                // Replace markdown image with HTML img tag using the media URL
+                const replacement = `<img src="${mediaUrl}" alt="${imageName}" />`;
+                processedContent = processedContent.replace(match[0], replacement);
+                
+                console.log('DocumentService: Replaced', match[0], 'with', replacement);
+                
             } catch (error) {
-                console.error(`DocumentService: Error processing image ${imagePath}:`, error);
-            }
-        }
-        
-        // Process wiki-style images
-        for (const match of wikiMatches) {
-            const fullMatch = match[0];
-            const imagePath = match[1];
-            const altText = match[2] || ''; // Alt text is optional in wiki syntax
-            
-            console.log(`DocumentService: Processing wiki image - Alt: "${altText}", Path: "${imagePath}"`);
-
-            try {
-                const imageFile = this.app.metadataCache.getFirstLinkpathDest(
-                    imagePath,
-                    sourceFile.path
-                );
-
-                if (!imageFile) {
-                    console.warn(`DocumentService: Image not found: ${imagePath}`);
-                    continue;
-                }
-
-                console.log(`DocumentService: Found image file: ${imageFile.path}`);
-                
-                const imageData = await this.app.vault.readBinary(imageFile);
-                console.log(`DocumentService: Read ${imageData.byteLength} bytes from ${imageFile.name}`);
-                
-                const mediaUrl = await this.mediaService.uploadImage(
-                    imageData,
-                    imageFile.name,
-                    folderId
-                );
-
-                // Convert wiki syntax to markdown with Umbraco URL
-                updatedContent = updatedContent.replace(
-                    fullMatch,
-                    `![${altText}](${mediaUrl})`
-                );
-
-                console.log(`DocumentService: Replaced ${imagePath} with ${mediaUrl}`);
-            } catch (error) {
-                console.error(`DocumentService: Error processing image ${imagePath}:`, error);
+                console.error('DocumentService: Error processing image', imageName, error);
             }
         }
 
-        return updatedContent;
+        console.log('DocumentService: Processed content:', processedContent.substring(0, 200));
+        return { content: processedContent, uploadedImages };
     }
 
     async createDocument(
@@ -167,7 +110,10 @@ export class DocumentService {
         let processedContent = content;
         if (sourceFile) {
             console.log('Processing images in content...');
-            processedContent = await this.processImagesInContent(content, sourceFile);
+            // Pass the app.vault instead of sourceFile
+            const { content: processed } = await this.processImagesInContent(content, this.app.vault);
+            processedContent = processed;
+            console.log('Images processed. Content length:', processedContent.length);
         }
 
         const documentId = await GenerateGuid();
