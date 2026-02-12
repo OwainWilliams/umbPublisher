@@ -70,6 +70,34 @@ export class SettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    /**
+     * Fetches all properties from a document type including composed document types
+     */
+    private async fetchAllDocTypeProperties(docTypeId: string, websiteUrl: string, token: string): Promise<any[]> {
+        const docTypeDetails = await GetUmbracoDocTypeById(docTypeId, websiteUrl, token);
+        if (!docTypeDetails) {
+            return [];
+        }
+
+        let allProps: any[] = docTypeDetails.properties || [];
+        if (docTypeDetails.compositions) {
+            for (const comp of docTypeDetails.compositions) {
+                if (comp.properties) {
+                    allProps = allProps.concat(comp.properties);
+                }
+                const compId = comp.documentType?.id || comp.id;
+                if (compId) {
+                    const compDetails = await GetUmbracoDocTypeById(compId, websiteUrl, token);
+                    if (compDetails?.properties) {
+                        allProps = allProps.concat(compDetails.properties);
+                    }
+                }
+            }
+        }
+
+        return allProps;
+    }
+
     display(): void {
         let parentNodeDropdown: HTMLSelectElement | null = null;
         let fetchButton: HTMLButtonElement | null = null;
@@ -316,26 +344,10 @@ export class SettingTab extends PluginSettingTab {
 						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
 						if (!token) return;
 
-						const docTypeDetails = await GetUmbracoDocTypeById(blogDocTypeId, websiteUrl, token);
-						if (!docTypeDetails) {
+						const allProps = await this.fetchAllDocTypeProperties(blogDocTypeId, websiteUrl, token);
+						if (allProps.length === 0) {
 							new Notice('Failed to fetch document type.');
 							return;
-						}
-
-						let allProps: any[] = docTypeDetails.properties || [];
-						if (docTypeDetails.compositions) {
-							for (const comp of docTypeDetails.compositions) {
-								if (comp.properties) {
-									allProps = allProps.concat(comp.properties);
-								}
-								const compId = comp.documentType?.id || comp.id;
-								if (compId) {
-									const compDetails = await GetUmbracoDocTypeById(compId, websiteUrl, token);
-									if (compDetails?.properties) {
-										allProps = allProps.concat(compDetails.properties);
-									}
-								}
-							}
 						}
 
 						this.cachedDocTypeProperties = allProps;
@@ -448,26 +460,10 @@ export class SettingTab extends PluginSettingTab {
 					const token = await getBearerToken(websiteUrl, clientId, clientSecret);
 					if (!token) return;
 
-					const docTypeDetails = await GetUmbracoDocTypeById(blogDocTypeId, websiteUrl, token);
-					if (!docTypeDetails) {
+					const allProps = await this.fetchAllDocTypeProperties(blogDocTypeId, websiteUrl, token);
+					if (allProps.length === 0) {
 						new Notice('Failed to fetch document type.');
 						return;
-					}
-
-					let allProps: any[] = docTypeDetails.properties || [];
-					if (docTypeDetails.compositions) {
-						for (const comp of docTypeDetails.compositions) {
-							if (comp.properties) {
-								allProps = allProps.concat(comp.properties);
-							}
-							const compId = comp.documentType?.id || comp.id;
-							if (compId) {
-								const compDetails = await GetUmbracoDocTypeById(compId, websiteUrl, token);
-								if (compDetails?.properties) {
-									allProps = allProps.concat(compDetails.properties);
-								}
-							}
-						}
 					}
 
 					this.cachedDocTypeProperties = allProps;
