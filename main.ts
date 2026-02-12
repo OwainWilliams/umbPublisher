@@ -104,8 +104,6 @@ export default class umbpublisher extends Plugin {
                 return;
             }
 
-            console.log('Document type fetched:', docType);
-
             // Parse content
             const content = await this.contentParser.parseContent(view);
             const title = this.contentParser.getActiveFileTitle();
@@ -114,8 +112,6 @@ export default class umbpublisher extends Plugin {
                 new Notice('Failed to parse content or title.');
                 return;
             }
-
-            console.log('Parsed content:', { title, contentLength: content.content.length });
 
             // Get the current file
             const currentFile = view.file;

@@ -10,8 +10,6 @@ export async function GetBlockListElementTypes(
     websiteUrl: string,
     token: string
 ): Promise<any[]> {
-    console.log('Fetching BlockList element types for:', docTypeId, blockPropertyAlias);
-
     // First, get the document type details to find the BlockList property
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${docTypeId}`;
 
@@ -38,17 +36,14 @@ export async function GetBlockListElementTypes(
             // Compositions may only be references - fetch the full document type
             const compDocTypeId = comp.documentType?.id || comp.id;
             if (compDocTypeId) {
-                console.log('Fetching composition document type:', compDocTypeId);
                 const compEndpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${compDocTypeId}`;
                 const compRaw = await CallUmbracoApi(compEndpoint, token, 'GET');
                 if (compRaw?.json?.properties) {
-                    console.log('Composition properties:', compRaw.json.properties.map((p: any) => p.alias));
                     properties = properties.concat(compRaw.json.properties);
                 }
             }
         }
     }
-    console.log('All collected property aliases:', properties.map((p: any) => p.alias));
 
     // Find the BlockList property
     const blockListProperty = properties.find((p: any) => p.alias === blockPropertyAlias);
@@ -58,9 +53,6 @@ export async function GetBlockListElementTypes(
         return [];
     }
 
-    // Log the property details for debugging
-    console.log('Found property:', blockListProperty);
-
     // The property only contains a reference to the data type by ID
     // We need to fetch the full data type details to get editorAlias and configuration
     const dataTypeId = blockListProperty.dataType?.id;
@@ -69,8 +61,6 @@ export async function GetBlockListElementTypes(
         new Notice(`Property '${blockPropertyAlias}' has no data type ID.`);
         return [];
     }
-
-    console.log('Fetching data type details for ID:', dataTypeId);
 
     // Fetch the full data type details
     const dataTypeEndpoint = `${websiteUrl}/umbraco/management/api/v1/data-type/${dataTypeId}`;
@@ -82,9 +72,6 @@ export async function GetBlockListElementTypes(
     }
 
     const dataType = dataTypeRaw.json;
-    console.log('Data type details:', dataType);
-    console.log('Data type editorAlias:', dataType.editorAlias);
-    console.log('Data type configuration:', dataType.configuration);
 
     // Check if it's a BlockList or BlockGrid property
     const editorAlias = dataType.editorAlias || '';
@@ -108,8 +95,6 @@ export async function GetBlockListElementTypes(
         new Notice('No element types configured for this BlockList property.');
         return [];
     }
-
-    console.log('Blocks configuration:', blocksConfig.value);
 
     // Fetch each element type to get its real name
     const elementTypes: any[] = [];
@@ -140,8 +125,6 @@ export async function GetElementTypeById(
     websiteUrl: string,
     token: string
 ): Promise<any> {
-    console.log('Fetching element type by ID:', elementTypeId);
-
     // Element types are document types, so use the document-type endpoint
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${elementTypeId}`;
 
@@ -156,7 +139,6 @@ export async function GetElementTypeById(
         return null;
     }
 
-    console.log('Element type fetched:', elementTypeRaw.json);
     return elementTypeRaw.json;
 }
 
@@ -166,11 +148,8 @@ export async function GetElementTypeById(
  */
 export function FindContentProperty(properties: any[]): any | null {
     if (!properties || properties.length === 0) {
-        console.log('FindContentProperty: No properties provided');
         return null;
     }
-
-    console.log('FindContentProperty: Searching through properties:', properties);
 
     // Common content property names/aliases (case-insensitive)
     const contentPropertyNames = [
@@ -190,7 +169,6 @@ export function FindContentProperty(properties: any[]): any | null {
             (p: any) => p.alias?.toLowerCase() === name.toLowerCase()
         );
         if (property) {
-            console.log('FindContentProperty: Found property by alias:', property);
             return property;
         }
     }
@@ -201,14 +179,12 @@ export function FindContentProperty(properties: any[]): any | null {
             (p: any) => p.alias?.toLowerCase().includes(name.toLowerCase())
         );
         if (property) {
-            console.log('FindContentProperty: Found property by partial match:', property);
             return property;
         }
     }
 
     // If still no match, return the first property as fallback
     if (properties.length > 0) {
-        console.log('FindContentProperty: Using first property as fallback:', properties[0]);
         return properties[0];
     }
 

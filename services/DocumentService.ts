@@ -43,11 +43,8 @@ export class DocumentService {
 
         const matches = Array.from(processedContent.matchAll(imageRegex));
         
-        console.log('DocumentService: Found', matches.length, 'images to process');
-        
         for (const match of matches) {
             const imageName = match[1];
-            console.log('DocumentService: Processing image:', imageName);
 
             try {
                 // Get all files in the vault to find the image
@@ -59,26 +56,17 @@ export class DocumentService {
                 );
                 
                 if (!imageFile) {
-                    console.warn('DocumentService: Image file not found:', imageName);
                     continue;
                 }
-
-                console.log('DocumentService: Found image file:', imageFile.path);
 
                 const arrayBuffer = await vault.adapter.readBinary(imageFile.path);
                 const fileName = imageFile.name;
                 
-                console.log('DocumentService: Read image data, size:', arrayBuffer.byteLength);
-                
                 const obsidianFolderId = await this.mediaService.getOrCreateObsidianFolder();
                 const mediaId = await this.mediaService.uploadImage(arrayBuffer, fileName, obsidianFolderId);
                 
-                console.log('DocumentService: Uploaded image, media ID:', mediaId);
-                
                 // Get the media URL
                 const mediaUrl = await this.mediaService.getMediaUrl(mediaId);
-                
-                console.log('DocumentService: Got media URL:', mediaUrl);
                 
                 uploadedImages.push(mediaId);
                 
@@ -86,14 +74,10 @@ export class DocumentService {
                 const replacement = `<img src="${mediaUrl}" alt="${imageName}" />`;
                 processedContent = processedContent.replace(match[0], replacement);
 
-                console.log('DocumentService: Replaced', match[0], 'with', replacement);
-
             } catch (error) {
-                console.error('DocumentService: Error processing image', imageName, error);
             }
         }
 
-        console.log('DocumentService: Processed content:', processedContent.substring(0, 200));
         return { content: processedContent, uploadedImages };
     }
 
@@ -110,11 +94,9 @@ export class DocumentService {
         // Process images if source file is provided
         let processedContent = content;
         if (sourceFile) {
-            console.log('Processing images in content...');
             // Pass the app.vault instead of sourceFile
             const { content: processed } = await this.processImagesInContent(content, this.app.vault);
             processedContent = processed;
-            console.log('Images processed. Content length:', processedContent.length);
         }
 
         const documentId = await GenerateGuid();
@@ -154,17 +136,12 @@ export class DocumentService {
         titleAlias: string,
         contentAlias: string
     ): Promise<any> {
-        console.log('Creating document using legacy mode...');
-
         // First, get the document type details to understand the property structure
-        console.log('Fetching document type details...');
         const docTypeDetails = await this.apiService.callApi(`/umbraco/management/api/v1/document-type/${docTypeId}`);
         
         if (!docTypeDetails) {
             throw new Error('Failed to fetch document type details');
         }
-        
-        console.log('Document type details:', JSON.stringify(docTypeDetails, null, 2));
         
         // Build the values array with proper editor aliases
         const values: any[] = [];
@@ -186,20 +163,11 @@ export class DocumentService {
             }
         }
 
-        console.log('Available properties:', properties.map((p: any) => ({ alias: p.alias, editorAlias: p.dataType?.editorAlias })));
-        console.log('Looking for title alias:', titleAlias);
-        console.log('Looking for content alias:', contentAlias);
-        
         const titleProperty = properties.find((p: any) => p.alias === titleAlias);
         const contentProperty = properties.find((p: any) => p.alias === contentAlias);
         
-        console.log('Title property found:', titleProperty);
-        console.log('Content property found:', contentProperty);
-        
         // If we can't find the properties, let's try a simpler approach
         if (!titleProperty || !contentProperty) {
-            console.log('Properties not found in document type, using fallback approach...');
-            
             // Add title property with fallback
             values.push({
                 editorAlias: 'Umbraco.TextBox',
@@ -297,11 +265,9 @@ export class DocumentService {
             ]
         };
 
-        console.log('Final document request payload:', JSON.stringify(documentRequest, null, 2));
 
         try {
             // Create document directly without validation
-            console.log('Creating document...');
             const createResponse = await this.apiService.callApi(
                 '/umbraco/management/api/v1/document',
                 'POST',
@@ -312,12 +278,9 @@ export class DocumentService {
                 throw new Error('Document creation failed - no response received');
             }
 
-            console.log('Document creation successful:', createResponse);
             return createResponse;
 
         } catch (error) {
-            console.error('Error in document creation:', error);
-            
             if (error.message && error.message.includes('400')) {
                 throw new Error(`Invalid request data. Check:\n1. Document type ID '${docTypeId}' exists\n2. Property aliases '${titleAlias}' and '${contentAlias}' are correct\n3. Parent node ID '${parentId}' is valid\n\nOriginal error: ${error.message}`);
             }
@@ -339,7 +302,6 @@ export class DocumentService {
     ): Promise<any> {
         const isBlockGrid = settings.contentMode === 'blockGrid';
         const modeLabel = isBlockGrid ? 'Block Grid' : 'Block List';
-        console.log(`Creating document using ${modeLabel} mode...`);
 
         // Generate GUIDs for block structure
         const elementUdi = await GenerateGuid();
@@ -485,10 +447,8 @@ export class DocumentService {
             ]
         };
 
-        console.log(`Final document request payload (${modeLabel}):`, JSON.stringify(documentRequest, null, 2));
 
         try {
-            console.log(`Creating document with ${modeLabel}...`);
             const createResponse = await this.apiService.callApi(
                 '/umbraco/management/api/v1/document',
                 'POST',
@@ -499,12 +459,9 @@ export class DocumentService {
                 throw new Error('Document creation failed - no response received');
             }
 
-            console.log('Document creation successful:', createResponse);
             return createResponse;
 
         } catch (error) {
-            console.error('Error in document creation:', error);
-
             if (error.message && error.message.includes('400')) {
                 throw new Error(`Invalid ${modeLabel} request. Check element type and property configuration.\n\nOriginal error: ${error.message}`);
             }

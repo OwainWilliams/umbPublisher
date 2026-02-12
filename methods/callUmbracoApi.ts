@@ -29,14 +29,7 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 		return response; // Return the parsed JSON response
 	}
 	catch (error: any) {
-		console.error('CallUmbracoApi Error Details:', {
-			endpoint,
-			method,
-			error: error.message,
-			status: error.status,
-			response: error.response
-		});
-		
+
 		// Try to extract Umbraco-specific error details
 		let umbracoError: UmbracoErrorResponse | null = null;
 		try {
@@ -46,11 +39,9 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 				umbracoError = error.response as UmbracoErrorResponse;
 			}
 		} catch (parseError) {
-			console.warn('Could not parse Umbraco error response:', parseError);
 		}
 		
 		if (umbracoError) {
-			console.error('Umbraco Error Details:', umbracoError);
 			new Notice(`Umbraco API Error (${umbracoError.status}): ${umbracoError.title}\nDetail: ${umbracoError.detail}\nEndpoint: ${endpoint}`);
 		} else if (error.status === 404) {
 			new Notice(`404 Error - Endpoint not found: ${endpoint}\nCheck if the Management API is enabled and the URL is correct.`);

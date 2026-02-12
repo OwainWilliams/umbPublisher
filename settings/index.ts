@@ -205,8 +205,6 @@ export class SettingTab extends PluginSettingTab {
                             token
                         );
 
-                        console.log('Fetched allowed child doc types:', this.cachedAllowedChildDocTypes);
-
                         if (childDocTypeDropdown) {
                             childDocTypeDropdown.innerHTML = '';
                             const defaultOption = document.createElement('option');
@@ -247,8 +245,6 @@ export class SettingTab extends PluginSettingTab {
                     childDocTypeDropdown.value = this.plugin.settings.blogDocTypeId || '';
 
                     dropdown.onChange(async (value) => {
-                        console.log('Document type dropdown changed:', value);
-                        
                         if (value) {
                             // Get the bearer token
                             const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
@@ -257,12 +253,10 @@ export class SettingTab extends PluginSettingTab {
                             if (token) {
                                 // Fetch the full document type details to get the alias
                                 const docTypeDetails = await GetUmbracoDocTypeById(value, websiteUrl, token);
-                                console.log('Document type details:', docTypeDetails);
                                 
                                 if (docTypeDetails) {
                                     this.plugin.settings.blogDocTypeId = docTypeDetails.id;
                                     this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
-                                    console.log('Updated settings:', this.plugin.settings.blogDocTypeId, this.plugin.settings.blogDocTypeAlias);
                                 }
                             }
                         } else {
@@ -545,8 +539,6 @@ export class SettingTab extends PluginSettingTab {
 						websiteUrl,
 						token
 					);
-
-					console.log(`Fetched ${modeLabel} element types:`, this.cachedBlockListElementTypes);
 
 					if (elementTypeDropdown) {
 						elementTypeDropdown.innerHTML = '';
