@@ -1,3 +1,5 @@
+export type ContentMode = 'propertyEditor' | 'blockList' | 'blockGrid';
+
 export interface umbpublisherSettings {
     mySetting: string;
     websiteUrl: string;
@@ -8,6 +10,11 @@ export interface umbpublisherSettings {
 	clientSecret: string;
 	titleAlias: string;
 	blogContentAlias: string;
+	contentMode: ContentMode;
+	blockPropertyAlias: string;
+	blockElementTypeId: string;
+	blockElementTypeAlias: string;
+	blockContentPropertyAlias: string;
 }
 
 export const DEFAULT_SETTINGS: umbpublisherSettings = {
@@ -20,6 +27,11 @@ export const DEFAULT_SETTINGS: umbpublisherSettings = {
 	clientSecret: 'your-client-secret',
 	titleAlias: 'title',
 	blogContentAlias: 'blogContent',
+	contentMode: 'propertyEditor',
+	blockPropertyAlias: '',
+	blockElementTypeId: '',
+	blockElementTypeAlias: '',
+	blockContentPropertyAlias: '',
 }
 
 

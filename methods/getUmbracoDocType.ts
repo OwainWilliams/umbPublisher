@@ -28,7 +28,6 @@ import { CallUmbracoApi } from './callUmbracoApi';
 // }
 
 export async function GetUmbracoDocTypeById(docTypeId: string, websiteUrl: string, token: any): Promise<any> {
-        console.log('Fetching document type by ID:', docTypeId);    
         const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${docTypeId}`;
         if (token === null) {
             new Notice('Bearer token is null. Please check your settings.');
@@ -40,7 +39,6 @@ export async function GetUmbracoDocTypeById(docTypeId: string, websiteUrl: strin
             new Notice('Failed to fetch document type by ID.');
             return null;
         }
-        console.log('Document type fetched:', docTypeId, docTypeRaw);
         return docTypeRaw.json; // Return the document type details
 }
  

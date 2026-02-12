@@ -42,7 +42,6 @@ export class UmbracoApiService {
             }
             return null;
         } catch (error) {
-            console.error('Token error:', error);
             new Notice(`Error fetching bearer token: ${error}`);
             return null;
         }
@@ -55,11 +54,6 @@ export class UmbracoApiService {
         const url = `${this.websiteUrl}${endpoint}`;
         
         try {
-            console.log(`Making API call: ${method} ${url}`);
-            if (body) {
-                console.log('Request body:', JSON.stringify(body, null, 2));
-            }
-
             const response = await requestUrl({
                 url,
                 method,
@@ -71,10 +65,6 @@ export class UmbracoApiService {
                 throw: false // Don't throw on HTTP errors, handle them manually
             });
 
-            console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
-            console.log('Raw response text:', response.text);
-
             // Check for HTTP error status codes
             if (response.status < 200 || response.status >= 300) {
                 throw new Error(`HTTP ${response.status}: ${response.text || 'Unknown error'}`);
@@ -82,7 +72,6 @@ export class UmbracoApiService {
 
             // Handle empty response (which is common for successful POST/PUT operations)
             if (!response.text || response.text.trim() === '') {
-                console.log('Empty response received - treating as success for POST/PUT');
                 if (method === 'POST' || method === 'PUT') {
                     return { success: true, status: response.status } as unknown as T;
                 }
@@ -92,15 +81,10 @@ export class UmbracoApiService {
             // Try to parse JSON manually
             try {
                 const jsonResponse = JSON.parse(response.text);
-                console.log('Parsed JSON response:', jsonResponse);
                 return jsonResponse as T;
             } catch (jsonError) {
-                console.error('Failed to parse JSON response:', jsonError);
-                console.log('Response text that failed to parse:', response.text);
-                
                 // If it's a successful status code but invalid JSON, still treat as success
                 if (response.status >= 200 && response.status < 300) {
-                    console.log('Successful status with non-JSON response, treating as success');
                     return { success: true, status: response.status, rawResponse: response.text } as unknown as T;
                 }
                 
@@ -108,12 +92,6 @@ export class UmbracoApiService {
             }
 
         } catch (error) {
-            console.error(`API call failed:`, {
-                endpoint: url,
-                method,
-                status: error.status || 'unknown',
-                error: error.message || 'Unknown error',
-            });
             throw error;
         }
     }
@@ -168,16 +146,6 @@ export class UmbracoApiService {
                 offset += part.length;
             }
 
-            console.log('Upload URL:', url);
-            console.log('Boundary:', boundary);
-            console.log('ID:', id);
-            console.log('File size:', fileData.byteLength);
-            console.log('Total body size:', fullBody.length);
-            
-            // Debug: show first 300 bytes
-            const preview = new TextDecoder().decode(fullBody.slice(0, 300));
-            console.log('Body preview:', preview);
-
             const response = await requestUrl({
                 url,
                 method: 'POST',
@@ -189,16 +157,12 @@ export class UmbracoApiService {
                 throw: false
             });
 
-            console.log('Upload response status:', response.status);
-            console.log('Upload response text:', response.text);
-
             if (response.status < 200 || response.status >= 300) {
                 throw new Error(`HTTP ${response.status}: ${response.text}`);
             }
 
             // Handle empty or non-JSON responses
             if (!response.text || response.text.trim() === '') {
-                console.log('Empty response received - file uploaded successfully');
                 return { success: true, status: response.status };
             }
 
@@ -206,11 +170,9 @@ export class UmbracoApiService {
             try {
                 return JSON.parse(response.text);
             } catch (jsonError) {
-                console.log('Non-JSON response received:', response.text);
                 return { success: true, status: response.status, rawResponse: response.text };
             }
         } catch (error) {
-            console.error('File upload failed:', error);
             throw error;
         }
     }
@@ -222,10 +184,6 @@ export class UmbracoApiService {
         const url = `${this.websiteUrl}${endpoint}`;
         
         try {
-            console.log('Uploading binary to:', url);
-            console.log('Content-Type:', mimeType);
-            console.log('Data size:', fileData.byteLength);
-
             const response = await requestUrl({
                 url,
                 method: 'PUT',  // Changed from POST to PUT
@@ -237,16 +195,12 @@ export class UmbracoApiService {
                 throw: false
             });
 
-            console.log('Binary upload response status:', response.status);
-            console.log('Binary upload response text:', response.text);
-
             if (response.status < 200 || response.status >= 300) {
                 throw new Error(`HTTP ${response.status}: ${response.text}`);
             }
 
             // Handle empty or non-JSON responses
             if (!response.text || response.text.trim() === '') {
-                console.log('Empty response received - binary uploaded successfully');
                 return { success: true, status: response.status };
             }
 
@@ -254,11 +208,9 @@ export class UmbracoApiService {
             try {
                 return JSON.parse(response.text);
             } catch (jsonError) {
-                console.log('Non-JSON response received:', response.text);
                 return { success: true, status: response.status, rawResponse: response.text };
             }
         } catch (error) {
-            console.error('Binary upload failed:', error);
             throw error;
         }
     }

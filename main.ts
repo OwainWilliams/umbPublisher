@@ -104,8 +104,6 @@ export default class umbpublisher extends Plugin {
                 return;
             }
 
-            console.log('Document type fetched:', docType);
-
             // Parse content
             const content = await this.contentParser.parseContent(view);
             const title = this.contentParser.getActiveFileTitle();
@@ -114,8 +112,6 @@ export default class umbpublisher extends Plugin {
                 new Notice('Failed to parse content or title.');
                 return;
             }
-
-            console.log('Parsed content:', { title, contentLength: content.content.length });
 
             // Get the current file
             const currentFile = view.file;
@@ -132,7 +128,8 @@ export default class umbpublisher extends Plugin {
                 this.settings.blogParentNodeId,
                 this.settings.titleAlias,
                 this.settings.blogContentAlias,
-                currentFile  // Pass the file here
+                currentFile,  // Pass the file here
+                this.settings  // Pass settings for BlockList mode
             );
 
             new Notice('Document created successfully!');
@@ -142,7 +139,16 @@ export default class umbpublisher extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        const rawData = await this.loadData();
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, rawData);
+
+        // Migration: convert old boolean useBlockList to new contentMode
+        if (rawData && (rawData as any).useBlockList !== undefined && (rawData as any).contentMode === undefined) {
+            this.settings.contentMode = (rawData as any).useBlockList ? 'blockList' : 'propertyEditor';
+            delete (this.settings as any).useBlockList;
+            await this.saveData(this.settings);
+        }
+
         this.initializeServices();
     }
 
