@@ -13,11 +13,6 @@ export async function GetBlockListElementTypes(
     // First, get the document type details to find the BlockList property
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${docTypeId}`;
 
-    if (token === null) {
-        new Notice('Bearer token is null. Please check your settings.');
-        return [];
-    }
-
     const docTypeRaw = await CallUmbracoApi(endpoint, token, 'GET');
     if (!docTypeRaw) {
         new Notice('Failed to fetch document type.');
@@ -96,23 +91,23 @@ export async function GetBlockListElementTypes(
         return [];
     }
 
-    // Fetch each element type to get its real name
-    const elementTypes: any[] = [];
-    for (const block of blocksConfig.value) {
-        const elementTypeId = block.contentElementTypeKey;
-        if (!elementTypeId) continue;
+    // Fetch all element types in parallel to improve performance
+    const elementTypePromises = blocksConfig.value
+        .filter((block: any) => block.contentElementTypeKey)
+        .map(async (block: any) => {
+            const elementTypeId = block.contentElementTypeKey;
+            const etEndpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${elementTypeId}`;
+            const etRaw = await CallUmbracoApi(etEndpoint, token, 'GET');
+            const name = etRaw?.json?.name || block.label || 'Unknown';
 
-        const etEndpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${elementTypeId}`;
-        const etRaw = await CallUmbracoApi(etEndpoint, token, 'GET');
-        const name = etRaw?.json?.name || block.label || 'Unknown';
-
-        elementTypes.push({
-            id: elementTypeId,
-            name: name,
-            alias: etRaw?.json?.alias || '',
+            return {
+                id: elementTypeId,
+                name: name,
+                alias: etRaw?.json?.alias || '',
+            };
         });
-    }
 
+    const elementTypes = await Promise.all(elementTypePromises);
     return elementTypes;
 }
 
@@ -127,11 +122,6 @@ export async function GetElementTypeById(
 ): Promise<any> {
     // Element types are document types, so use the document-type endpoint
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${elementTypeId}`;
-
-    if (token === null) {
-        new Notice('Bearer token is null. Please check your settings.');
-        return null;
-    }
 
     const elementTypeRaw = await CallUmbracoApi(endpoint, token, 'GET');
     if (!elementTypeRaw) {
