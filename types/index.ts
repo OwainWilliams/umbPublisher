@@ -8,6 +8,11 @@ export interface umbpublisherSettings {
 	clientSecret: string;
 	titleAlias: string;
 	blogContentAlias: string;
+	useBlockList: boolean;
+	blockListPropertyAlias: string;
+	blockListElementTypeId: string;
+	blockListElementTypeAlias: string;
+	blockListContentPropertyAlias: string;
 }
 
 export const DEFAULT_SETTINGS: umbpublisherSettings = {
@@ -20,6 +25,11 @@ export const DEFAULT_SETTINGS: umbpublisherSettings = {
 	clientSecret: 'your-client-secret',
 	titleAlias: 'title',
 	blogContentAlias: 'blogContent',
+	useBlockList: false,
+	blockListPropertyAlias: '',
+	blockListElementTypeId: '',
+	blockListElementTypeAlias: '',
+	blockListContentPropertyAlias: '',
 }
 
 

@@ -18,15 +18,37 @@ export class SettingsValidator {
         if (!this.validateBasicSettings(settings)) {
             return false;
         }
-        
-        const publishRequired = ['blogDocTypeId', 'titleAlias', 'blogContentAlias'];
-        const missing = publishRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
-        
-        if (missing.length > 0) {
-            new Notice(`Missing required publish settings: ${missing.join(', ')}`);
+
+        // Base requirement: document type and title
+        const baseRequired = ['blogDocTypeId', 'titleAlias'];
+        const missingBase = baseRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
+
+        if (missingBase.length > 0) {
+            new Notice(`Missing required publish settings: ${missingBase.join(', ')}`);
             return false;
         }
-        
+
+        // Validate based on mode
+        if (settings.useBlockList) {
+            // BlockList mode validation
+            const blockListRequired = ['blockListPropertyAlias', 'blockListElementTypeId', 'blockListContentPropertyAlias'];
+            const missingBlockList = blockListRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
+
+            if (missingBlockList.length > 0) {
+                new Notice(`Missing required BlockList settings: ${missingBlockList.join(', ')}`);
+                return false;
+            }
+        } else {
+            // Legacy mode validation
+            const legacyRequired = ['blogContentAlias'];
+            const missingLegacy = legacyRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
+
+            if (missingLegacy.length > 0) {
+                new Notice(`Missing required content settings: ${missingLegacy.join(', ')}`);
+                return false;
+            }
+        }
+
         return true;
     }
 }
