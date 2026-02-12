@@ -30,7 +30,7 @@ export class SettingsValidator {
 
         // Validate based on content mode
         if (settings.contentMode === 'blockList' || settings.contentMode === 'blockGrid') {
-            const blockRequired = ['blockListPropertyAlias', 'blockListElementTypeId', 'blockListContentPropertyAlias'];
+            const blockRequired = ['blockPropertyAlias', 'blockElementTypeId', 'blockContentPropertyAlias'];
             const missingBlock = blockRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
 
             if (missingBlock.length > 0) {

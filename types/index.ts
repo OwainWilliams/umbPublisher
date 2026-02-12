@@ -11,10 +11,10 @@ export interface umbpublisherSettings {
 	titleAlias: string;
 	blogContentAlias: string;
 	contentMode: ContentMode;
-	blockListPropertyAlias: string;
-	blockListElementTypeId: string;
-	blockListElementTypeAlias: string;
-	blockListContentPropertyAlias: string;
+	blockPropertyAlias: string;
+	blockElementTypeId: string;
+	blockElementTypeAlias: string;
+	blockContentPropertyAlias: string;
 }
 
 export const DEFAULT_SETTINGS: umbpublisherSettings = {
@@ -28,10 +28,10 @@ export const DEFAULT_SETTINGS: umbpublisherSettings = {
 	titleAlias: 'title',
 	blogContentAlias: 'blogContent',
 	contentMode: 'propertyEditor',
-	blockListPropertyAlias: '',
-	blockListElementTypeId: '',
-	blockListElementTypeAlias: '',
-	blockListContentPropertyAlias: '',
+	blockPropertyAlias: '',
+	blockElementTypeId: '',
+	blockElementTypeAlias: '',
+	blockContentPropertyAlias: '',
 }
 
 

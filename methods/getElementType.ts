@@ -6,11 +6,11 @@ import { CallUmbracoApi } from './callUmbracoApi';
  */
 export async function GetBlockListElementTypes(
     docTypeId: string,
-    blockListPropertyAlias: string,
+    blockPropertyAlias: string,
     websiteUrl: string,
     token: string
 ): Promise<any[]> {
-    console.log('Fetching BlockList element types for:', docTypeId, blockListPropertyAlias);
+    console.log('Fetching BlockList element types for:', docTypeId, blockPropertyAlias);
 
     // First, get the document type details to find the BlockList property
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${docTypeId}`;
@@ -51,10 +51,10 @@ export async function GetBlockListElementTypes(
     console.log('All collected property aliases:', properties.map((p: any) => p.alias));
 
     // Find the BlockList property
-    const blockListProperty = properties.find((p: any) => p.alias === blockListPropertyAlias);
+    const blockListProperty = properties.find((p: any) => p.alias === blockPropertyAlias);
 
     if (!blockListProperty) {
-        new Notice(`BlockList property '${blockListPropertyAlias}' not found on document type.`);
+        new Notice(`BlockList property '${blockPropertyAlias}' not found on document type.`);
         return [];
     }
 
@@ -66,7 +66,7 @@ export async function GetBlockListElementTypes(
     const dataTypeId = blockListProperty.dataType?.id;
 
     if (!dataTypeId) {
-        new Notice(`Property '${blockListPropertyAlias}' has no data type ID.`);
+        new Notice(`Property '${blockPropertyAlias}' has no data type ID.`);
         return [];
     }
 
@@ -95,7 +95,7 @@ export async function GetBlockListElementTypes(
         editorAlias.includes('Block.Grid');
 
     if (!isBlockEditor) {
-        new Notice(`Property '${blockListPropertyAlias}' is not a Block List or Block Grid property. Editor alias: ${editorAlias}`);
+        new Notice(`Property '${blockPropertyAlias}' is not a Block List or Block Grid property. Editor alias: ${editorAlias}`);
         return [];
     }
 

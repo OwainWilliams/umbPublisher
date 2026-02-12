@@ -343,7 +343,7 @@ export class DocumentService {
 
         // Generate GUIDs for block structure
         const elementUdi = await GenerateGuid();
-        const elementTypeKey = settings.blockListElementTypeId;
+        const elementTypeKey = settings.blockElementTypeId;
 
         // Build layout item based on mode
         const layoutKey = isBlockGrid ? 'Umbraco.BlockGrid' : 'Umbraco.BlockList';
@@ -367,7 +367,7 @@ export class DocumentService {
                 {
                     contentTypeKey: elementTypeKey,
                     udi: `umb://element/${elementUdi}`,
-                    [settings.blockListContentPropertyAlias]: content
+                    [settings.blockContentPropertyAlias]: content
                 }
             ],
             settingsData: []
@@ -398,10 +398,10 @@ export class DocumentService {
         }
 
         // Find the BlockList property
-        const blockListProperty = properties.find((p: any) => p.alias === settings.blockListPropertyAlias);
+        const blockListProperty = properties.find((p: any) => p.alias === settings.blockPropertyAlias);
 
         if (!blockListProperty) {
-            throw new Error(`BlockList property '${settings.blockListPropertyAlias}' not found on document type.`);
+            throw new Error(`BlockList property '${settings.blockPropertyAlias}' not found on document type.`);
         }
 
         // Build values array
@@ -409,7 +409,7 @@ export class DocumentService {
         const values: any[] = [
             {
                 editorAlias: editorAlias,
-                alias: settings.blockListPropertyAlias,
+                alias: settings.blockPropertyAlias,
                 value: blockValue,
                 culture: null,
                 segment: null
@@ -430,7 +430,7 @@ export class DocumentService {
 
         // Add default boolean and date properties
         properties.forEach((prop: any) => {
-            if (prop.alias !== settings.blockListPropertyAlias && prop.alias !== settings.titleAlias) {
+            if (prop.alias !== settings.blockPropertyAlias && prop.alias !== settings.titleAlias) {
                 const editorAlias = prop.dataType?.editorAlias;
 
                 if (prop.alias === 'isIndexable' || prop.alias === 'isFollowable') {

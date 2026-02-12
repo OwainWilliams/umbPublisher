@@ -492,7 +492,7 @@ export class SettingTab extends PluginSettingTab {
 							blockPropDropdown?.appendChild(option);
 						});
 
-						blockPropDropdown.value = this.plugin.settings.blockListPropertyAlias || '';
+						blockPropDropdown.value = this.plugin.settings.blockPropertyAlias || '';
 					}
 				});
 			})
@@ -514,10 +514,10 @@ export class SettingTab extends PluginSettingTab {
 					});
 				}
 
-				blockPropDropdown.value = this.plugin.settings.blockListPropertyAlias || '';
+				blockPropDropdown.value = this.plugin.settings.blockPropertyAlias || '';
 
 				dropdown.onChange(async (value) => {
-					this.plugin.settings.blockListPropertyAlias = value;
+					this.plugin.settings.blockPropertyAlias = value;
 					await this.plugin.saveSettings();
 				});
 			});
@@ -529,9 +529,9 @@ export class SettingTab extends PluginSettingTab {
 			.setDesc('Select the element type to use for content blocks')
 			.addButton(button => {
 				button.setButtonText('Fetch element types').onClick(async () => {
-					const { websiteUrl, clientId, clientSecret, blogDocTypeId, blockListPropertyAlias } = this.plugin.settings;
+					const { websiteUrl, clientId, clientSecret, blogDocTypeId, blockPropertyAlias } = this.plugin.settings;
 
-					if (!websiteUrl || !clientId || !clientSecret || !blogDocTypeId || !blockListPropertyAlias) {
+					if (!websiteUrl || !clientId || !clientSecret || !blogDocTypeId || !blockPropertyAlias) {
 						new Notice('Please configure all required settings first.');
 						return;
 					}
@@ -541,7 +541,7 @@ export class SettingTab extends PluginSettingTab {
 
 					this.cachedBlockListElementTypes = await GetBlockListElementTypes(
 						blogDocTypeId,
-						blockListPropertyAlias,
+						blockPropertyAlias,
 						websiteUrl,
 						token
 					);
@@ -562,7 +562,7 @@ export class SettingTab extends PluginSettingTab {
 							elementTypeDropdown?.appendChild(option);
 						});
 
-						elementTypeDropdown.value = this.plugin.settings.blockListElementTypeId || '';
+						elementTypeDropdown.value = this.plugin.settings.blockElementTypeId || '';
 					}
 				});
 			})
@@ -584,7 +584,7 @@ export class SettingTab extends PluginSettingTab {
 					});
 				}
 
-				elementTypeDropdown.value = this.plugin.settings.blockListElementTypeId || '';
+				elementTypeDropdown.value = this.plugin.settings.blockElementTypeId || '';
 
 				dropdown.onChange(async (value) => {
 					if (value) {
@@ -595,15 +595,15 @@ export class SettingTab extends PluginSettingTab {
 							const elementTypeDetails = await GetElementTypeById(value, websiteUrl, token);
 
 							if (elementTypeDetails) {
-								this.plugin.settings.blockListElementTypeId = elementTypeDetails.id;
-								this.plugin.settings.blockListElementTypeAlias = elementTypeDetails.alias;
+								this.plugin.settings.blockElementTypeId = elementTypeDetails.id;
+								this.plugin.settings.blockElementTypeAlias = elementTypeDetails.alias;
 								this.cachedElementTypeProperties = elementTypeDetails.properties || [];
 							}
 						}
 					} else {
-						this.plugin.settings.blockListElementTypeId = '';
-						this.plugin.settings.blockListElementTypeAlias = '';
-						this.plugin.settings.blockListContentPropertyAlias = '';
+						this.plugin.settings.blockElementTypeId = '';
+						this.plugin.settings.blockElementTypeAlias = '';
+						this.plugin.settings.blockContentPropertyAlias = '';
 						this.cachedElementTypeProperties = [];
 					}
 
@@ -613,7 +613,7 @@ export class SettingTab extends PluginSettingTab {
 			});
 
 		// Content property dropdown - shown when element type is selected
-		if (this.plugin.settings.blockListElementTypeId) {
+		if (this.plugin.settings.blockElementTypeId) {
 			let contentPropDropdown: HTMLSelectElement | null = null;
 
 			new Setting(containerEl)
@@ -621,9 +621,9 @@ export class SettingTab extends PluginSettingTab {
 				.setDesc('Select the property on the element type where content will be stored')
 				.addButton(button => {
 					button.setButtonText('Fetch properties').onClick(async () => {
-						const { websiteUrl, clientId, clientSecret, blockListElementTypeId } = this.plugin.settings;
+						const { websiteUrl, clientId, clientSecret, blockElementTypeId } = this.plugin.settings;
 
-						if (!blockListElementTypeId) {
+						if (!blockElementTypeId) {
 							new Notice('Please select an element type first.');
 							return;
 						}
@@ -631,7 +631,7 @@ export class SettingTab extends PluginSettingTab {
 						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
 						if (!token) return;
 
-						const elementTypeDetails = await GetElementTypeById(blockListElementTypeId, websiteUrl, token);
+						const elementTypeDetails = await GetElementTypeById(blockElementTypeId, websiteUrl, token);
 						if (elementTypeDetails) {
 							this.cachedElementTypeProperties = elementTypeDetails.properties || [];
 						}
@@ -650,7 +650,7 @@ export class SettingTab extends PluginSettingTab {
 								contentPropDropdown?.appendChild(option);
 							});
 
-							contentPropDropdown.value = this.plugin.settings.blockListContentPropertyAlias || '';
+							contentPropDropdown.value = this.plugin.settings.blockContentPropertyAlias || '';
 						}
 					});
 				})
@@ -672,10 +672,10 @@ export class SettingTab extends PluginSettingTab {
 						});
 					}
 
-					contentPropDropdown.value = this.plugin.settings.blockListContentPropertyAlias || '';
+					contentPropDropdown.value = this.plugin.settings.blockContentPropertyAlias || '';
 
 					dropdown.onChange(async (value) => {
-						this.plugin.settings.blockListContentPropertyAlias = value;
+						this.plugin.settings.blockContentPropertyAlias = value;
 						await this.plugin.saveSettings();
 					});
 				});
