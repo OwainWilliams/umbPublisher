@@ -119,9 +119,9 @@ export class DocumentService {
 
         const documentId = await GenerateGuid();
 
-        // Branch based on BlockList mode
-        if (settings?.useBlockList) {
-            return this.createDocumentWithBlockList(
+        // Branch based on content mode
+        if (settings?.contentMode === 'blockList' || settings?.contentMode === 'blockGrid') {
+            return this.createDocumentWithBlocks(
                 documentId,
                 docTypeId,
                 title,
@@ -327,9 +327,9 @@ export class DocumentService {
     }
 
     /**
-     * NEW: Creates document with BlockList structure
+     * Creates document with Block List or Block Grid structure
      */
-    private async createDocumentWithBlockList(
+    private async createDocumentWithBlocks(
         documentId: string,
         docTypeId: string,
         title: string,
@@ -337,20 +337,31 @@ export class DocumentService {
         parentId: string | null,
         settings: any
     ): Promise<any> {
-        console.log('Creating document using BlockList mode...');
+        const isBlockGrid = settings.contentMode === 'blockGrid';
+        const modeLabel = isBlockGrid ? 'Block Grid' : 'Block List';
+        console.log(`Creating document using ${modeLabel} mode...`);
 
-        // Generate GUIDs for BlockList structure
+        // Generate GUIDs for block structure
         const elementUdi = await GenerateGuid();
         const elementTypeKey = settings.blockListElementTypeId;
 
-        // Build BlockList JSON structure
-        const blockListValue = {
+        // Build layout item based on mode
+        const layoutKey = isBlockGrid ? 'Umbraco.BlockGrid' : 'Umbraco.BlockList';
+        const layoutItem = isBlockGrid
+            ? {
+                contentUdi: `umb://element/${elementUdi}`,
+                areas: [],
+                columnSpan: 12,
+                rowSpan: 1
+            }
+            : {
+                contentUdi: `umb://element/${elementUdi}`
+            };
+
+        // Build block JSON structure
+        const blockValue = {
             layout: {
-                "Umbraco.BlockList": [
-                    {
-                        contentUdi: `umb://element/${elementUdi}`
-                    }
-                ]
+                [layoutKey]: [layoutItem]
             },
             contentData: [
                 {
@@ -394,11 +405,12 @@ export class DocumentService {
         }
 
         // Build values array
+        const editorAlias = isBlockGrid ? 'Umbraco.BlockGrid' : 'Umbraco.BlockList';
         const values: any[] = [
             {
-                editorAlias: 'Umbraco.BlockList',
+                editorAlias: editorAlias,
                 alias: settings.blockListPropertyAlias,
-                value: blockListValue,
+                value: blockValue,
                 culture: null,
                 segment: null
             }
@@ -473,10 +485,10 @@ export class DocumentService {
             ]
         };
 
-        console.log('Final document request payload (BlockList):', JSON.stringify(documentRequest, null, 2));
+        console.log(`Final document request payload (${modeLabel}):`, JSON.stringify(documentRequest, null, 2));
 
         try {
-            console.log('Creating document with BlockList...');
+            console.log(`Creating document with ${modeLabel}...`);
             const createResponse = await this.apiService.callApi(
                 '/umbraco/management/api/v1/document',
                 'POST',
@@ -494,7 +506,7 @@ export class DocumentService {
             console.error('Error in document creation:', error);
 
             if (error.message && error.message.includes('400')) {
-                throw new Error(`Invalid BlockList request. Check element type and property configuration.\n\nOriginal error: ${error.message}`);
+                throw new Error(`Invalid ${modeLabel} request. Check element type and property configuration.\n\nOriginal error: ${error.message}`);
             }
 
             throw error;

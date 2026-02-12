@@ -86,12 +86,16 @@ export async function GetBlockListElementTypes(
     console.log('Data type editorAlias:', dataType.editorAlias);
     console.log('Data type configuration:', dataType.configuration);
 
-    // Check if it's actually a BlockList property (more flexible check)
+    // Check if it's a BlockList or BlockGrid property
     const editorAlias = dataType.editorAlias || '';
-    const isBlockList = editorAlias.includes('BlockList') || editorAlias.includes('Block.List');
+    const isBlockEditor =
+        editorAlias.includes('BlockList') ||
+        editorAlias.includes('Block.List') ||
+        editorAlias.includes('BlockGrid') ||
+        editorAlias.includes('Block.Grid');
 
-    if (!isBlockList) {
-        new Notice(`Property '${blockListPropertyAlias}' is not a BlockList property. Editor alias: ${editorAlias}`);
+    if (!isBlockEditor) {
+        new Notice(`Property '${blockListPropertyAlias}' is not a Block List or Block Grid property. Editor alias: ${editorAlias}`);
         return [];
     }
 

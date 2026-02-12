@@ -28,18 +28,18 @@ export class SettingsValidator {
             return false;
         }
 
-        // Validate based on mode
-        if (settings.useBlockList) {
-            // BlockList mode validation
-            const blockListRequired = ['blockListPropertyAlias', 'blockListElementTypeId', 'blockListContentPropertyAlias'];
-            const missingBlockList = blockListRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
+        // Validate based on content mode
+        if (settings.contentMode === 'blockList' || settings.contentMode === 'blockGrid') {
+            const blockRequired = ['blockListPropertyAlias', 'blockListElementTypeId', 'blockListContentPropertyAlias'];
+            const missingBlock = blockRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
 
-            if (missingBlockList.length > 0) {
-                new Notice(`Missing required BlockList settings: ${missingBlockList.join(', ')}`);
+            if (missingBlock.length > 0) {
+                const modeLabel = settings.contentMode === 'blockGrid' ? 'Block Grid' : 'Block List';
+                new Notice(`Missing required ${modeLabel} settings: ${missingBlock.join(', ')}`);
                 return false;
             }
         } else {
-            // Legacy mode validation
+            // Property Editor mode validation
             const legacyRequired = ['blogContentAlias'];
             const missingLegacy = legacyRequired.filter(key => !settings[key as keyof umbpublisherSettings]);
 

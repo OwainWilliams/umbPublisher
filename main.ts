@@ -143,7 +143,16 @@ export default class umbpublisher extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        const rawData = await this.loadData();
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, rawData);
+
+        // Migration: convert old boolean useBlockList to new contentMode
+        if (rawData && (rawData as any).useBlockList !== undefined && (rawData as any).contentMode === undefined) {
+            this.settings.contentMode = (rawData as any).useBlockList ? 'blockList' : 'propertyEditor';
+            delete (this.settings as any).useBlockList;
+            await this.saveData(this.settings);
+        }
+
         this.initializeServices();
     }
 

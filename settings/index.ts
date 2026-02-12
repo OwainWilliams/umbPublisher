@@ -2,6 +2,7 @@ import umbpublisher from "main";
 import { App, PluginSettingTab, Setting, requestUrl, Notice } from "obsidian";
 import { GetAllowedChildDocTypes, GetUmbracoDocTypeById } from "methods/getUmbracoDocType";
 import { GetBlockListElementTypes, GetElementTypeById } from "methods/getElementType";
+import { ContentMode } from "../types/index";
 
 async function getBearerToken(websiteUrl: string, clientId: string, clientSecret: string): Promise<string | null> {
     const tokenEndpoint = `${websiteUrl}/umbraco/management/api/v1/security/back-office/token`;
@@ -277,272 +278,32 @@ export class SettingTab extends PluginSettingTab {
                 });
         }
 
-		// BlockList Configuration Section
+		// Content Mode Selection
 		new Setting(containerEl)
-			.setName('Use Block List')
-			.setDesc('Add content as a BlockList item instead of direct property')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.useBlockList)
-				.onChange(async (value) => {
-					this.plugin.settings.useBlockList = value;
-					await this.plugin.saveSettings();
-					this.display(); // Refresh to show/hide BlockList settings
-				}));
-
-		// Show BlockList settings when enabled
-		if (this.plugin.settings.useBlockList && this.plugin.settings.blogDocTypeId) {
-
-			// BlockList Property Alias - fetch from doc type properties (including compositions)
-			let blockListPropDropdown: HTMLSelectElement | null = null;
-
-			new Setting(containerEl)
-				.setName('BlockList property')
-				.setDesc('Select the BlockList property on your document type')
-				.addButton(button => {
-					button.setButtonText('Fetch properties').onClick(async () => {
-						const { websiteUrl, clientId, clientSecret, blogDocTypeId } = this.plugin.settings;
-
-						if (!blogDocTypeId) {
-							new Notice('Please select a document type first.');
-							return;
-						}
-
-						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-						if (!token) return;
-
-						// Fetch doc type and collect all properties including compositions
-						const docTypeDetails = await GetUmbracoDocTypeById(blogDocTypeId, websiteUrl, token);
-						if (!docTypeDetails) {
-							new Notice('Failed to fetch document type.');
-							return;
-						}
-
-						let allProps: any[] = docTypeDetails.properties || [];
-						if (docTypeDetails.compositions) {
-							for (const comp of docTypeDetails.compositions) {
-								if (comp.properties) {
-									allProps = allProps.concat(comp.properties);
-								}
-								const compId = comp.documentType?.id || comp.id;
-								if (compId) {
-									const compDetails = await GetUmbracoDocTypeById(compId, websiteUrl, token);
-									if (compDetails?.properties) {
-										allProps = allProps.concat(compDetails.properties);
-									}
-								}
-							}
-						}
-
-						this.cachedDocTypeProperties = allProps;
-
-						if (blockListPropDropdown) {
-							blockListPropDropdown.innerHTML = '';
-							const defaultOption = document.createElement('option');
-							defaultOption.value = '';
-							defaultOption.text = '[Select Property]';
-							blockListPropDropdown.appendChild(defaultOption);
-
-							this.cachedDocTypeProperties.forEach((prop: any) => {
-								const option = document.createElement('option');
-								option.value = prop.alias;
-								option.text = prop.name || prop.alias;
-								blockListPropDropdown?.appendChild(option);
-							});
-
-							blockListPropDropdown.value = this.plugin.settings.blockListPropertyAlias || '';
-						}
-					});
-				})
-				.addDropdown(dropdown => {
-					blockListPropDropdown = dropdown.selectEl;
-
-					blockListPropDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
-					defaultOption.value = '';
-					defaultOption.text = '[Select Property]';
-					blockListPropDropdown.appendChild(defaultOption);
-
-					if (this.cachedDocTypeProperties.length > 0) {
-						this.cachedDocTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
-							option.value = prop.alias;
-							option.text = prop.name || prop.alias;
-							blockListPropDropdown?.appendChild(option);
-						});
-					}
-
-					blockListPropDropdown.value = this.plugin.settings.blockListPropertyAlias || '';
-
-					dropdown.onChange(async (value) => {
-						this.plugin.settings.blockListPropertyAlias = value;
-						await this.plugin.saveSettings();
-					});
-				});
-
-			let elementTypeDropdown: HTMLSelectElement | null = null;
-
-			// Fetch BlockList Element Types
-			new Setting(containerEl)
-				.setName('BlockList element type')
-				.setDesc('Select the element type to use for content blocks')
-				.addButton(button => {
-					button.setButtonText('Fetch element types').onClick(async () => {
-						const { websiteUrl, clientId, clientSecret, blogDocTypeId, blockListPropertyAlias } = this.plugin.settings;
-
-						if (!websiteUrl || !clientId || !clientSecret || !blogDocTypeId || !blockListPropertyAlias) {
-							new Notice('Please configure all required settings first.');
-							return;
-						}
-
-						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-						if (!token) return;
-
-						// Fetch element types allowed for the BlockList property
-						this.cachedBlockListElementTypes = await GetBlockListElementTypes(
-							blogDocTypeId,
-							blockListPropertyAlias,
-							websiteUrl,
-							token
-						);
-
-						console.log('Fetched BlockList element types:', this.cachedBlockListElementTypes);
-
-						if (elementTypeDropdown) {
-							elementTypeDropdown.innerHTML = '';
-							const defaultOption = document.createElement('option');
-							defaultOption.value = '';
-							defaultOption.text = '[Select Element Type]';
-							elementTypeDropdown.appendChild(defaultOption);
-
-							this.cachedBlockListElementTypes.forEach(elementType => {
-								const option = document.createElement('option');
-								option.value = elementType.id;
-								option.text = elementType.name || elementType.alias;
-								elementTypeDropdown?.appendChild(option);
-							});
-
-							elementTypeDropdown.value = this.plugin.settings.blockListElementTypeId || '';
-						}
-					});
-				})
-				.addDropdown(dropdown => {
-					elementTypeDropdown = dropdown.selectEl;
-
-					elementTypeDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
-					defaultOption.value = '';
-					defaultOption.text = '[Select Element Type]';
-					elementTypeDropdown.appendChild(defaultOption);
-
-					if (this.cachedBlockListElementTypes.length > 0) {
-						this.cachedBlockListElementTypes.forEach(elementType => {
-							const option = document.createElement('option');
-							option.value = elementType.id;
-							option.text = elementType.name || elementType.alias;
-							elementTypeDropdown?.appendChild(option);
-						});
-					}
-
-					elementTypeDropdown.value = this.plugin.settings.blockListElementTypeId || '';
-
-					dropdown.onChange(async (value) => {
-						if (value) {
-							const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
-							const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-
-							if (token) {
-								const elementTypeDetails = await GetElementTypeById(value, websiteUrl, token);
-
-								if (elementTypeDetails) {
-									this.plugin.settings.blockListElementTypeId = elementTypeDetails.id;
-									this.plugin.settings.blockListElementTypeAlias = elementTypeDetails.alias;
-									this.cachedElementTypeProperties = elementTypeDetails.properties || [];
-								}
-							}
-						} else {
-							this.plugin.settings.blockListElementTypeId = '';
-							this.plugin.settings.blockListElementTypeAlias = '';
-							this.plugin.settings.blockListContentPropertyAlias = '';
-							this.cachedElementTypeProperties = [];
-						}
-
+			.setName('Content mode')
+			.setDesc('How content is stored on the document type in Umbraco')
+			.addDropdown(dropdown => {
+				dropdown
+					.addOption('propertyEditor', 'Property Editor')
+					.addOption('blockList', 'Block List')
+					.addOption('blockGrid', 'Block Grid')
+					.setValue(this.plugin.settings.contentMode)
+					.onChange(async (value) => {
+						this.plugin.settings.contentMode = value as ContentMode;
 						await this.plugin.saveSettings();
 						this.display();
 					});
-				});
+			});
 
-			// Content property dropdown - shown when element type is selected
-			if (this.plugin.settings.blockListElementTypeId) {
-				let contentPropDropdown: HTMLSelectElement | null = null;
+		// Show block settings when Block List or Block Grid mode is selected
+		if ((this.plugin.settings.contentMode === 'blockList' || this.plugin.settings.contentMode === 'blockGrid') && this.plugin.settings.blogDocTypeId) {
+			const modeLabel = this.plugin.settings.contentMode === 'blockGrid' ? 'Block Grid' : 'Block List';
+			this.renderBlockSettings(containerEl, modeLabel);
 
-				new Setting(containerEl)
-					.setName('Content property')
-					.setDesc('Select the property on the element type where content will be stored')
-					.addButton(button => {
-						button.setButtonText('Fetch properties').onClick(async () => {
-							const { websiteUrl, clientId, clientSecret, blockListElementTypeId } = this.plugin.settings;
-
-							if (!blockListElementTypeId) {
-								new Notice('Please select an element type first.');
-								return;
-							}
-
-							const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-							if (!token) return;
-
-							const elementTypeDetails = await GetElementTypeById(blockListElementTypeId, websiteUrl, token);
-							if (elementTypeDetails) {
-								this.cachedElementTypeProperties = elementTypeDetails.properties || [];
-							}
-
-							if (contentPropDropdown) {
-								contentPropDropdown.innerHTML = '';
-								const defaultOption = document.createElement('option');
-								defaultOption.value = '';
-								defaultOption.text = '[Select Property]';
-								contentPropDropdown.appendChild(defaultOption);
-
-								this.cachedElementTypeProperties.forEach((prop: any) => {
-									const option = document.createElement('option');
-									option.value = prop.alias;
-									option.text = prop.name || prop.alias;
-									contentPropDropdown?.appendChild(option);
-								});
-
-								contentPropDropdown.value = this.plugin.settings.blockListContentPropertyAlias || '';
-							}
-						});
-					})
-					.addDropdown(dropdown => {
-						contentPropDropdown = dropdown.selectEl;
-
-						contentPropDropdown.innerHTML = '';
-						const defaultOption = document.createElement('option');
-						defaultOption.value = '';
-						defaultOption.text = '[Select Property]';
-						contentPropDropdown.appendChild(defaultOption);
-
-						if (this.cachedElementTypeProperties.length > 0) {
-							this.cachedElementTypeProperties.forEach((prop: any) => {
-								const option = document.createElement('option');
-								option.value = prop.alias;
-								option.text = prop.name || prop.alias;
-								contentPropDropdown?.appendChild(option);
-							});
-						}
-
-						contentPropDropdown.value = this.plugin.settings.blockListContentPropertyAlias || '';
-
-						dropdown.onChange(async (value) => {
-							this.plugin.settings.blockListContentPropertyAlias = value;
-							await this.plugin.saveSettings();
-						});
-					});
-			}
 		}
 
-		// Show legacy settings only when NOT using BlockList
-		if (!this.plugin.settings.useBlockList && this.plugin.settings.blogDocTypeId) {
+		// Show legacy settings only when using Property Editor mode
+		if (this.plugin.settings.contentMode === 'propertyEditor' && this.plugin.settings.blogDocTypeId) {
 			let titleDropdown: HTMLSelectElement | null = null;
 			let contentDropdown: HTMLSelectElement | null = null;
 
@@ -665,6 +426,256 @@ export class SettingTab extends PluginSettingTab {
 
 					dropdown.onChange(async (value) => {
 						this.plugin.settings.blogContentAlias = value;
+						await this.plugin.saveSettings();
+					});
+				});
+		}
+	}
+
+	/**
+	 * Renders the shared block settings (property picker, element type picker, content property picker)
+	 * Used by both Block List and Block Grid modes.
+	 */
+	private renderBlockSettings(containerEl: HTMLElement, modeLabel: string): void {
+		let blockPropDropdown: HTMLSelectElement | null = null;
+
+		new Setting(containerEl)
+			.setName(`${modeLabel} property`)
+			.setDesc(`Select the ${modeLabel} property on your document type`)
+			.addButton(button => {
+				button.setButtonText('Fetch properties').onClick(async () => {
+					const { websiteUrl, clientId, clientSecret, blogDocTypeId } = this.plugin.settings;
+
+					if (!blogDocTypeId) {
+						new Notice('Please select a document type first.');
+						return;
+					}
+
+					const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+					if (!token) return;
+
+					const docTypeDetails = await GetUmbracoDocTypeById(blogDocTypeId, websiteUrl, token);
+					if (!docTypeDetails) {
+						new Notice('Failed to fetch document type.');
+						return;
+					}
+
+					let allProps: any[] = docTypeDetails.properties || [];
+					if (docTypeDetails.compositions) {
+						for (const comp of docTypeDetails.compositions) {
+							if (comp.properties) {
+								allProps = allProps.concat(comp.properties);
+							}
+							const compId = comp.documentType?.id || comp.id;
+							if (compId) {
+								const compDetails = await GetUmbracoDocTypeById(compId, websiteUrl, token);
+								if (compDetails?.properties) {
+									allProps = allProps.concat(compDetails.properties);
+								}
+							}
+						}
+					}
+
+					this.cachedDocTypeProperties = allProps;
+
+					if (blockPropDropdown) {
+						blockPropDropdown.innerHTML = '';
+						const defaultOption = document.createElement('option');
+						defaultOption.value = '';
+						defaultOption.text = '[Select Property]';
+						blockPropDropdown.appendChild(defaultOption);
+
+						this.cachedDocTypeProperties.forEach((prop: any) => {
+							const option = document.createElement('option');
+							option.value = prop.alias;
+							option.text = prop.name || prop.alias;
+							blockPropDropdown?.appendChild(option);
+						});
+
+						blockPropDropdown.value = this.plugin.settings.blockListPropertyAlias || '';
+					}
+				});
+			})
+			.addDropdown(dropdown => {
+				blockPropDropdown = dropdown.selectEl;
+
+				blockPropDropdown.innerHTML = '';
+				const defaultOption = document.createElement('option');
+				defaultOption.value = '';
+				defaultOption.text = '[Select Property]';
+				blockPropDropdown.appendChild(defaultOption);
+
+				if (this.cachedDocTypeProperties.length > 0) {
+					this.cachedDocTypeProperties.forEach((prop: any) => {
+						const option = document.createElement('option');
+						option.value = prop.alias;
+						option.text = prop.name || prop.alias;
+						blockPropDropdown?.appendChild(option);
+					});
+				}
+
+				blockPropDropdown.value = this.plugin.settings.blockListPropertyAlias || '';
+
+				dropdown.onChange(async (value) => {
+					this.plugin.settings.blockListPropertyAlias = value;
+					await this.plugin.saveSettings();
+				});
+			});
+
+		let elementTypeDropdown: HTMLSelectElement | null = null;
+
+		new Setting(containerEl)
+			.setName(`${modeLabel} element type`)
+			.setDesc('Select the element type to use for content blocks')
+			.addButton(button => {
+				button.setButtonText('Fetch element types').onClick(async () => {
+					const { websiteUrl, clientId, clientSecret, blogDocTypeId, blockListPropertyAlias } = this.plugin.settings;
+
+					if (!websiteUrl || !clientId || !clientSecret || !blogDocTypeId || !blockListPropertyAlias) {
+						new Notice('Please configure all required settings first.');
+						return;
+					}
+
+					const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+					if (!token) return;
+
+					this.cachedBlockListElementTypes = await GetBlockListElementTypes(
+						blogDocTypeId,
+						blockListPropertyAlias,
+						websiteUrl,
+						token
+					);
+
+					console.log(`Fetched ${modeLabel} element types:`, this.cachedBlockListElementTypes);
+
+					if (elementTypeDropdown) {
+						elementTypeDropdown.innerHTML = '';
+						const defaultOption = document.createElement('option');
+						defaultOption.value = '';
+						defaultOption.text = '[Select Element Type]';
+						elementTypeDropdown.appendChild(defaultOption);
+
+						this.cachedBlockListElementTypes.forEach(elementType => {
+							const option = document.createElement('option');
+							option.value = elementType.id;
+							option.text = elementType.name || elementType.alias;
+							elementTypeDropdown?.appendChild(option);
+						});
+
+						elementTypeDropdown.value = this.plugin.settings.blockListElementTypeId || '';
+					}
+				});
+			})
+			.addDropdown(dropdown => {
+				elementTypeDropdown = dropdown.selectEl;
+
+				elementTypeDropdown.innerHTML = '';
+				const defaultOption = document.createElement('option');
+				defaultOption.value = '';
+				defaultOption.text = '[Select Element Type]';
+				elementTypeDropdown.appendChild(defaultOption);
+
+				if (this.cachedBlockListElementTypes.length > 0) {
+					this.cachedBlockListElementTypes.forEach(elementType => {
+						const option = document.createElement('option');
+						option.value = elementType.id;
+						option.text = elementType.name || elementType.alias;
+						elementTypeDropdown?.appendChild(option);
+					});
+				}
+
+				elementTypeDropdown.value = this.plugin.settings.blockListElementTypeId || '';
+
+				dropdown.onChange(async (value) => {
+					if (value) {
+						const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
+						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+
+						if (token) {
+							const elementTypeDetails = await GetElementTypeById(value, websiteUrl, token);
+
+							if (elementTypeDetails) {
+								this.plugin.settings.blockListElementTypeId = elementTypeDetails.id;
+								this.plugin.settings.blockListElementTypeAlias = elementTypeDetails.alias;
+								this.cachedElementTypeProperties = elementTypeDetails.properties || [];
+							}
+						}
+					} else {
+						this.plugin.settings.blockListElementTypeId = '';
+						this.plugin.settings.blockListElementTypeAlias = '';
+						this.plugin.settings.blockListContentPropertyAlias = '';
+						this.cachedElementTypeProperties = [];
+					}
+
+					await this.plugin.saveSettings();
+					this.display();
+				});
+			});
+
+		// Content property dropdown - shown when element type is selected
+		if (this.plugin.settings.blockListElementTypeId) {
+			let contentPropDropdown: HTMLSelectElement | null = null;
+
+			new Setting(containerEl)
+				.setName('Content property')
+				.setDesc('Select the property on the element type where content will be stored')
+				.addButton(button => {
+					button.setButtonText('Fetch properties').onClick(async () => {
+						const { websiteUrl, clientId, clientSecret, blockListElementTypeId } = this.plugin.settings;
+
+						if (!blockListElementTypeId) {
+							new Notice('Please select an element type first.');
+							return;
+						}
+
+						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+						if (!token) return;
+
+						const elementTypeDetails = await GetElementTypeById(blockListElementTypeId, websiteUrl, token);
+						if (elementTypeDetails) {
+							this.cachedElementTypeProperties = elementTypeDetails.properties || [];
+						}
+
+						if (contentPropDropdown) {
+							contentPropDropdown.innerHTML = '';
+							const defaultOption = document.createElement('option');
+							defaultOption.value = '';
+							defaultOption.text = '[Select Property]';
+							contentPropDropdown.appendChild(defaultOption);
+
+							this.cachedElementTypeProperties.forEach((prop: any) => {
+								const option = document.createElement('option');
+								option.value = prop.alias;
+								option.text = prop.name || prop.alias;
+								contentPropDropdown?.appendChild(option);
+							});
+
+							contentPropDropdown.value = this.plugin.settings.blockListContentPropertyAlias || '';
+						}
+					});
+				})
+				.addDropdown(dropdown => {
+					contentPropDropdown = dropdown.selectEl;
+
+					contentPropDropdown.innerHTML = '';
+					const defaultOption = document.createElement('option');
+					defaultOption.value = '';
+					defaultOption.text = '[Select Property]';
+					contentPropDropdown.appendChild(defaultOption);
+
+					if (this.cachedElementTypeProperties.length > 0) {
+						this.cachedElementTypeProperties.forEach((prop: any) => {
+							const option = document.createElement('option');
+							option.value = prop.alias;
+							option.text = prop.name || prop.alias;
+							contentPropDropdown?.appendChild(option);
+						});
+					}
+
+					contentPropDropdown.value = this.plugin.settings.blockListContentPropertyAlias || '';
+
+					dropdown.onChange(async (value) => {
+						this.plugin.settings.blockListContentPropertyAlias = value;
 						await this.plugin.saveSettings();
 					});
 				});
