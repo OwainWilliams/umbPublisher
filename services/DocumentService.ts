@@ -2,6 +2,7 @@ import { UmbracoApiService } from './UmbracoApiService';
 import { MediaService } from './MediaService';
 import { GenerateGuid } from '../methods/generateGuid';
 import { Notice, TFile, App } from 'obsidian';
+import { umbpublisherSettings } from '../types/index';
 
 export interface CreateDocumentRequest {
     id: string;
@@ -89,7 +90,7 @@ export class DocumentService {
         titleAlias: string,
         contentAlias: string,
         sourceFile?: TFile,
-        settings?: any
+        settings?: umbpublisherSettings
     ): Promise<any> {
         // Process images if source file is provided
         let processedContent = content;
@@ -298,7 +299,7 @@ export class DocumentService {
         title: string,
         content: string,
         parentId: string | null,
-        settings: any
+        settings: umbpublisherSettings
     ): Promise<any> {
         const isBlockGrid = settings.contentMode === 'blockGrid';
         const modeLabel = isBlockGrid ? 'Block Grid' : 'Block List';
