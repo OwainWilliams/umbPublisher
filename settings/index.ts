@@ -104,10 +104,7 @@ export class SettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        // Prevent dropdowns from stretching the settings layout
-        const style = containerEl.createEl('style');
-        style.textContent = `.setting-item-control select { max-width: 200px; }`;
-
+        
         new Setting(containerEl)
             .setName('Website URL')
             .setDesc('The URL of the Umbraco website e.g. https://example.com')
@@ -157,12 +154,12 @@ export class SettingTab extends PluginSettingTab {
                     this.cachedNodes = await fetchAllContentNodes(websiteUrl, token);
                     if (parentNodeDropdown) {
                         parentNodeDropdown.innerHTML = '';
-                        const rootOption = document.createElement('option');
+                        const rootOption = createEl('option');
                         rootOption.value = '';
                         rootOption.text = '[Select Node]';
                         parentNodeDropdown.appendChild(rootOption);
                         this.cachedNodes.forEach(node => {
-                            const option = document.createElement('option');
+                            const option = createEl('option');
                             option.value = node.id;
                             option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
                             parentNodeDropdown?.appendChild(option);
@@ -175,13 +172,13 @@ export class SettingTab extends PluginSettingTab {
                 parentNodeDropdown = dropdown.selectEl;
                 // Populate dropdown from cache if available
                 parentNodeDropdown.innerHTML = '';
-                const rootOption = document.createElement('option');
+                const rootOption = createEl('option');
                 rootOption.value = '';
                 rootOption.text = '[Select Node]';
                 parentNodeDropdown.appendChild(rootOption);
                 if (this.cachedNodes.length > 0) {
                     this.cachedNodes.forEach(node => {
-                        const option = document.createElement('option');
+                        const option = createEl('option');
                         option.value = node.id;
                         option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
                         parentNodeDropdown?.appendChild(option);
@@ -235,13 +232,13 @@ export class SettingTab extends PluginSettingTab {
 
                         if (childDocTypeDropdown) {
                             childDocTypeDropdown.innerHTML = '';
-                            const defaultOption = document.createElement('option');
+                            const defaultOption = createEl('option');
                             defaultOption.value = '';
                             defaultOption.text = '[Select Document Type]';
                             childDocTypeDropdown.appendChild(defaultOption);
 
                             this.cachedAllowedChildDocTypes.forEach(docType => {
-                                const option = document.createElement('option');
+                                const option = createEl('option');
                                 option.value = docType.id;
                                 option.text = docType.name;
                                 childDocTypeDropdown?.appendChild(option);
@@ -256,14 +253,14 @@ export class SettingTab extends PluginSettingTab {
                     
                     // Populate dropdown from cache if available
                     childDocTypeDropdown.innerHTML = '';
-                    const defaultOption = document.createElement('option');
+                    const defaultOption = createEl('option');
                     defaultOption.value = '';
                     defaultOption.text = '[Select Document Type]';
                     childDocTypeDropdown.appendChild(defaultOption);
 
                     if (this.cachedAllowedChildDocTypes.length > 0) {
                         this.cachedAllowedChildDocTypes.forEach(docType => {
-                            const option = document.createElement('option');
+                            const option = createEl('option');
                             option.value = docType.id;
                             option.text = docType.name;
                             childDocTypeDropdown?.appendChild(option);
@@ -357,13 +354,13 @@ export class SettingTab extends PluginSettingTab {
 							if (!dd) continue;
 							const currentVal = dd.value;
 							dd.innerHTML = '';
-							const defaultOption = document.createElement('option');
+							const defaultOption = createEl('option');
 							defaultOption.value = '';
 							defaultOption.text = '[Select Property]';
 							dd.appendChild(defaultOption);
 
 							this.cachedDocTypeProperties.forEach((prop: any) => {
-								const option = document.createElement('option');
+								const option = createEl('option');
 								option.value = prop.alias;
 								option.text = prop.name || prop.alias;
 								dd.appendChild(option);
@@ -385,14 +382,14 @@ export class SettingTab extends PluginSettingTab {
 					titleDropdown = dropdown.selectEl;
 
 					titleDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
+					const defaultOption = createEl('option');
 					defaultOption.value = '';
 					defaultOption.text = '[Select Property]';
 					titleDropdown.appendChild(defaultOption);
 
 					if (this.cachedDocTypeProperties.length > 0) {
 						this.cachedDocTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							titleDropdown?.appendChild(option);
@@ -414,14 +411,14 @@ export class SettingTab extends PluginSettingTab {
 					contentDropdown = dropdown.selectEl;
 
 					contentDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
+					const defaultOption = createEl('option');
 					defaultOption.value = '';
 					defaultOption.text = '[Select Property]';
 					contentDropdown.appendChild(defaultOption);
 
 					if (this.cachedDocTypeProperties.length > 0) {
 						this.cachedDocTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							contentDropdown?.appendChild(option);
@@ -470,13 +467,13 @@ export class SettingTab extends PluginSettingTab {
 
 					if (blockPropDropdown) {
 						blockPropDropdown.innerHTML = '';
-						const defaultOption = document.createElement('option');
+						const defaultOption = createEl('option');
 						defaultOption.value = '';
 						defaultOption.text = '[Select Property]';
 						blockPropDropdown.appendChild(defaultOption);
 
 						this.cachedDocTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							blockPropDropdown?.appendChild(option);
@@ -490,14 +487,14 @@ export class SettingTab extends PluginSettingTab {
 				blockPropDropdown = dropdown.selectEl;
 
 				blockPropDropdown.innerHTML = '';
-				const defaultOption = document.createElement('option');
+				const defaultOption = createEl('option');
 				defaultOption.value = '';
 				defaultOption.text = '[Select Property]';
 				blockPropDropdown.appendChild(defaultOption);
 
 				if (this.cachedDocTypeProperties.length > 0) {
 					this.cachedDocTypeProperties.forEach((prop: any) => {
-						const option = document.createElement('option');
+						const option = createEl('option');
 						option.value = prop.alias;
 						option.text = prop.name || prop.alias;
 						blockPropDropdown?.appendChild(option);
@@ -538,13 +535,13 @@ export class SettingTab extends PluginSettingTab {
 
 					if (elementTypeDropdown) {
 						elementTypeDropdown.innerHTML = '';
-						const defaultOption = document.createElement('option');
+						const defaultOption = createEl('option');
 						defaultOption.value = '';
 						defaultOption.text = '[Select Element Type]';
 						elementTypeDropdown.appendChild(defaultOption);
 
 						this.cachedBlockListElementTypes.forEach(elementType => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = elementType.id;
 							option.text = elementType.name || elementType.alias;
 							elementTypeDropdown?.appendChild(option);
@@ -558,14 +555,14 @@ export class SettingTab extends PluginSettingTab {
 				elementTypeDropdown = dropdown.selectEl;
 
 				elementTypeDropdown.innerHTML = '';
-				const defaultOption = document.createElement('option');
+				const defaultOption = createEl('option');
 				defaultOption.value = '';
 				defaultOption.text = '[Select Element Type]';
 				elementTypeDropdown.appendChild(defaultOption);
 
 				if (this.cachedBlockListElementTypes.length > 0) {
 					this.cachedBlockListElementTypes.forEach(elementType => {
-						const option = document.createElement('option');
+						const option = createEl('option');
 						option.value = elementType.id;
 						option.text = elementType.name || elementType.alias;
 						elementTypeDropdown?.appendChild(option);
@@ -626,13 +623,13 @@ export class SettingTab extends PluginSettingTab {
 
 						if (contentPropDropdown) {
 							contentPropDropdown.innerHTML = '';
-							const defaultOption = document.createElement('option');
+							const defaultOption = createEl('option');
 							defaultOption.value = '';
 							defaultOption.text = '[Select Property]';
 							contentPropDropdown.appendChild(defaultOption);
 
 							this.cachedElementTypeProperties.forEach((prop: any) => {
-								const option = document.createElement('option');
+								const option = createEl('option');
 								option.value = prop.alias;
 								option.text = prop.name || prop.alias;
 								contentPropDropdown?.appendChild(option);
@@ -646,14 +643,14 @@ export class SettingTab extends PluginSettingTab {
 					contentPropDropdown = dropdown.selectEl;
 
 					contentPropDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
+					const defaultOption = createEl('option');
 					defaultOption.value = '';
 					defaultOption.text = '[Select Property]';
 					contentPropDropdown.appendChild(defaultOption);
 
 					if (this.cachedElementTypeProperties.length > 0) {
 						this.cachedElementTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							contentPropDropdown?.appendChild(option);

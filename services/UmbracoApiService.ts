@@ -53,8 +53,8 @@ export class UmbracoApiService {
 
         const url = `${this.websiteUrl}${endpoint}`;
         
-        try {
-            const response = await requestUrl({
+        const response = await requestUrl(
+            {
                 url,
                 method,
                 headers: {
@@ -89,14 +89,11 @@ export class UmbracoApiService {
                 }
                 
                 throw new Error(`Invalid JSON response: ${response.text}`);
-            }
-
-        } catch (error) {
-            throw error;
+            }           
         }
-    }
 
-    async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string, id?: string): Promise<any> {
+    
+        async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string, id?: string): Promise<any> {
         const token = await this.getBearerToken();
         if (!token) throw new Error('Failed to get bearer token');
 
@@ -183,8 +180,7 @@ export class UmbracoApiService {
 
         const url = `${this.websiteUrl}${endpoint}`;
         
-        try {
-            const response = await requestUrl({
+        const response = await requestUrl({
                 url,
                 method: 'PUT',  // Changed from POST to PUT
                 headers: {
@@ -210,12 +206,9 @@ export class UmbracoApiService {
             } catch (jsonError) {
                 return { success: true, status: response.status, rawResponse: response.text };
             }
-        } catch (error) {
-            throw error;
         }
-    }
 
-    clearToken(): void {
+        clearToken(): void {
         this.bearerToken = null;
     }
 }

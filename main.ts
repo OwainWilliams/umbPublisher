@@ -13,7 +13,7 @@ import { GetUmbracoDocTypeById } from "./methods/getUmbracoDocType";
 
 
 export default class umbpublisher extends Plugin {
-    settings: umbpublisherSettings;
+    settings: umbpublisherSettings = DEFAULT_SETTINGS;
     private icons = new umbpublisherIcons();
     private apiService: UmbracoApiService | null = null;
     private documentService: DocumentService | null = null;
@@ -59,7 +59,7 @@ export default class umbpublisher extends Plugin {
         await this.publishToUmbraco(view);
     }
 
-    private handleEditorCommand(checking: boolean, editor: Editor, view: MarkdownView): boolean {
+    private handleEditorCommand(checking: boolean | any): boolean {
         if (checking) return true;
         
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -68,7 +68,7 @@ export default class umbpublisher extends Plugin {
             return false;
         }
         
-        this.publishToUmbraco(view).catch(error => 
+        this.publishToUmbraco(activeView).catch(error => 
             ErrorHandler.handle(error, 'Publishing to Umbraco')
         );
         return true;

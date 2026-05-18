@@ -1,3 +1,4 @@
+import { log } from 'console';
 import { requestUrl, Notice } from 'obsidian';
 
 // Umbraco error response schema
@@ -39,6 +40,7 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 				umbracoError = error.response as UmbracoErrorResponse;
 			}
 		} catch (parseError) {
+			log('Failed to parse Umbraco error response:', parseError);
 		}
 		
 		if (umbracoError) {
