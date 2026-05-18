@@ -104,6 +104,11 @@ export default class umbpublisher extends Plugin {
                 return;
             }
 
+            if (!docType.id) {
+                new Notice('Document type is missing an ID. Please re-fetch and try again.');
+                return;
+            }
+
             // Parse content
             const content = await this.contentParser.parseContent(view);
             const title = this.contentParser.getActiveFileTitle();
@@ -147,7 +152,7 @@ export default class umbpublisher extends Plugin {
         const legacyRaw = rawData as LegacySettings | null;
         if (legacyRaw && legacyRaw.useBlockList !== undefined && legacyRaw.contentMode === undefined) {
             this.settings.contentMode = legacyRaw.useBlockList ? 'blockList' : 'propertyEditor';
-            delete (this.settings as Record<string, unknown>).useBlockList;
+            Reflect.deleteProperty(this.settings as object, 'useBlockList');
             await this.saveData(this.settings);
         }
 

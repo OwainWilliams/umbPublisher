@@ -1,5 +1,6 @@
 import { requestUrl, Notice, RequestUrlResponse } from 'obsidian';
 
+
 // Umbraco error response schema
 interface UmbracoErrorResponse {
 	type: string;
@@ -37,10 +38,10 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 			if (err.response && typeof err.response === 'string') {
 				umbracoError = JSON.parse(err.response) as UmbracoErrorResponse;
 			} else if (err.response && typeof err.response === 'object') {
-				umbracoError = err.response as UmbracoErrorResponse;
+				umbracoError = err.response as unknown as UmbracoErrorResponse;
 			}
 		} catch (parseError) {
-			log('Failed to parse Umbraco error response:', parseError);
+			// If parsing fails, we can ignore it and show the generic error
 		}
 		
 		if (umbracoError) {

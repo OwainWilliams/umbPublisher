@@ -280,8 +280,13 @@ export class SettingTab extends PluginSettingTab {
                                 const docTypeDetails = await GetUmbracoDocTypeById(value, websiteUrl, token);
                                 
                                 if (docTypeDetails) {
-                                    this.plugin.settings.blogDocTypeId = docTypeDetails.id;
-                                    this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
+									if (docTypeDetails.id && docTypeDetails.alias) {
+										this.plugin.settings.blogDocTypeId = docTypeDetails.id;
+										this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
+									} else {
+										new Notice('Selected document type is missing required fields (id/alias).');
+										return;
+									}
                                 }
                             }
                         } else {
@@ -580,8 +585,13 @@ export class SettingTab extends PluginSettingTab {
 							const elementTypeDetails = await GetElementTypeById(value, websiteUrl, token);
 
 							if (elementTypeDetails) {
-								this.plugin.settings.blockElementTypeId = elementTypeDetails.id;
-								this.plugin.settings.blockElementTypeAlias = elementTypeDetails.alias;
+								if (elementTypeDetails.id && elementTypeDetails.alias) {
+									this.plugin.settings.blockElementTypeId = elementTypeDetails.id;
+									this.plugin.settings.blockElementTypeAlias = elementTypeDetails.alias;
+								} else {
+									new Notice('Selected element type is missing required fields (id/alias).');
+									return;
+								}
 								this.cachedElementTypeProperties = elementTypeDetails.properties || [];
 							}
 						}
