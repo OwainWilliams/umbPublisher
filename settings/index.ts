@@ -2,7 +2,7 @@ import umbpublisher from "main";
 import { App, PluginSettingTab, Setting, requestUrl, Notice } from "obsidian";
 import { GetAllowedChildDocTypes, GetUmbracoDocTypeById } from "methods/getUmbracoDocType";
 import { GetBlockListElementTypes, GetElementTypeById } from "methods/getElementType";
-import { ContentMode } from "../types/index";
+import { ContentMode, TokenResponse, UmbracoContentNode, UmbracoAllowedChildDocType, UmbracoElementTypeSummary, UmbracoProperty } from "../types/index";
 
 async function getBearerToken(websiteUrl: string, clientId: string, clientSecret: string): Promise<string | null> {
     const tokenEndpoint = `${websiteUrl}/umbraco/management/api/v1/security/back-office/token`;
@@ -18,7 +18,7 @@ async function getBearerToken(websiteUrl: string, clientId: string, clientSecret
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body.toString(),
         });
-        return (response.json as any).access_token;
+        return (response.json as TokenResponse).access_token;
     } catch (e) {
         new Notice('Failed to fetch bearer token');
         return null;
@@ -32,7 +32,7 @@ async function fetchAllContentNodes(
     token: string,
     parentId: string | null = null,
     depth: number = 0
-): Promise<any[]> {
+): Promise<UmbracoContentNode[]> {
     const endpoint = parentId
         ? `${websiteUrl}/umbraco/management/api/v1/tree/document/children?parentId=${parentId}`
         : `${websiteUrl}/umbraco/management/api/v1/tree/document/root?skip=0&take=100&foldersOnly=false`;
@@ -43,8 +43,8 @@ async function fetchAllContentNodes(
         headers: { 'Authorization': `Bearer ${token}` },
     });
 
-    const items = (response.json as any).items || [];
-    let allNodes: any[] = [];
+    const items = (response.json as { items?: UmbracoContentNode[] }).items || [];
+    let allNodes: UmbracoContentNode[] = [];
 
     for (const item of items) {
         // Add current node with depth for indentation
@@ -59,11 +59,11 @@ async function fetchAllContentNodes(
 
 export class SettingTab extends PluginSettingTab {
     plugin: umbpublisher;
-    private cachedNodes: any[] = []; // Store fetched nodes
-    private cachedAllowedChildDocTypes: any[] = []; // Store fetched allowed child document types
-    private cachedBlockListElementTypes: any[] = []; // Store fetched BlockList element types
-    private cachedElementTypeProperties: any[] = []; // Store fetched element type properties
-    private cachedDocTypeProperties: any[] = []; // Store fetched doc type properties for BlockList selection
+    private cachedNodes: UmbracoContentNode[] = [];
+    private cachedAllowedChildDocTypes: UmbracoAllowedChildDocType[] = [];
+    private cachedBlockListElementTypes: UmbracoElementTypeSummary[] = [];
+    private cachedElementTypeProperties: UmbracoProperty[] = [];
+    private cachedDocTypeProperties: UmbracoProperty[] = [];
 
     constructor(app: App, plugin: umbpublisher) {
         super(app, plugin);
@@ -73,13 +73,13 @@ export class SettingTab extends PluginSettingTab {
     /**
      * Fetches all properties from a document type including composed document types
      */
-    private async fetchAllDocTypeProperties(docTypeId: string, websiteUrl: string, token: string): Promise<any[]> {
+    private async fetchAllDocTypeProperties(docTypeId: string, websiteUrl: string, token: string): Promise<UmbracoProperty[]> {
         const docTypeDetails = await GetUmbracoDocTypeById(docTypeId, websiteUrl, token);
         if (!docTypeDetails) {
             return [];
         }
 
-        let allProps: any[] = docTypeDetails.properties || [];
+        let allProps: UmbracoProperty[] = docTypeDetails.properties || [];
         if (docTypeDetails.compositions) {
             for (const comp of docTypeDetails.compositions) {
                 if (comp.properties) {

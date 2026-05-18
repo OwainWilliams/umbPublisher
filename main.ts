@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
 import { Editor, MarkdownView, Notice, Plugin } from 'obsidian';
-import { DEFAULT_SETTINGS, umbpublisherSettings } from "./types/index";
+import { DEFAULT_SETTINGS, umbpublisherSettings, ContentMode } from "./types/index";
 import { SettingTab } from "./settings";
 import { umbpublisherIcons } from "./icons/icons";
 import { UmbracoApiService } from './services/UmbracoApiService';
@@ -143,9 +143,11 @@ export default class umbpublisher extends Plugin {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, rawData);
 
         // Migration: convert old boolean useBlockList to new contentMode
-        if (rawData && (rawData as any).useBlockList !== undefined && (rawData as any).contentMode === undefined) {
-            this.settings.contentMode = (rawData as any).useBlockList ? 'blockList' : 'propertyEditor';
-            delete (this.settings as any).useBlockList;
+        type LegacySettings = Record<string, unknown> & { useBlockList?: boolean; contentMode?: ContentMode };
+        const legacyRaw = rawData as LegacySettings | null;
+        if (legacyRaw && legacyRaw.useBlockList !== undefined && legacyRaw.contentMode === undefined) {
+            this.settings.contentMode = legacyRaw.useBlockList ? 'blockList' : 'propertyEditor';
+            delete (this.settings as Record<string, unknown>).useBlockList;
             await this.saveData(this.settings);
         }
 
