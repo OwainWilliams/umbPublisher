@@ -1,4 +1,5 @@
 import { requestUrl, Notice } from 'obsidian';
+import { TokenResponse } from '../types/index';
 
 export class UmbracoApiService {
     private bearerToken: string | null = null;
@@ -37,7 +38,7 @@ export class UmbracoApiService {
             });
 
             if (response.json) {
-                this.bearerToken = (response.json as any).access_token;
+                this.bearerToken = (response.json as TokenResponse).access_token;
                 return this.bearerToken;
             }
             return null;
@@ -47,7 +48,7 @@ export class UmbracoApiService {
         }
     }
 
-    async callApi<T>(endpoint: string, method: string = 'GET', body?: any): Promise<T | null> {
+    async callApi<T>(endpoint: string, method: string = 'GET', body?: unknown): Promise<T | null> {
         const token = await this.getBearerToken();
         if (!token) return null;
 
@@ -96,7 +97,7 @@ export class UmbracoApiService {
         }
     }
 
-    async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string, id?: string): Promise<any> {
+    async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string, id?: string): Promise<unknown> {
         const token = await this.getBearerToken();
         if (!token) throw new Error('Failed to get bearer token');
 
@@ -177,7 +178,7 @@ export class UmbracoApiService {
         }
     }
 
-    async uploadBinary(endpoint: string, fileData: ArrayBuffer, mimeType: string): Promise<any> {
+    async uploadBinary(endpoint: string, fileData: ArrayBuffer, mimeType: string): Promise<unknown> {
         const token = await this.getBearerToken();
         if (!token) throw new Error('Failed to get bearer token');
 

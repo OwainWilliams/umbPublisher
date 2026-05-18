@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
 import { CallUmbracoApi } from './callUmbracoApi';
+import { UmbracoProperty, UmbracoComposition, UmbracoDocType, UmbracoDataType, UmbracoDataTypeValue, UmbracoBlock, UmbracoElementTypeSummary } from '../types/index';
 
 /**
  * Get BlockList element types allowed for a specific BlockList property
@@ -9,7 +10,7 @@ export async function GetBlockListElementTypes(
     blockPropertyAlias: string,
     websiteUrl: string,
     token: string
-): Promise<any[]> {
+): Promise<UmbracoElementTypeSummary[]> {
     // First, get the document type details to find the BlockList property
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${docTypeId}`;
 
@@ -19,12 +20,12 @@ export async function GetBlockListElementTypes(
         return [];
     }
 
-    const docType = docTypeRaw.json;
+    const docType = docTypeRaw.json as UmbracoDocType;
 
     // Collect all properties: direct + from compositions
-    let properties: any[] = docType.properties || [];
+    let properties: UmbracoProperty[] = docType.properties || [];
     if (docType.compositions) {
-        for (const comp of docType.compositions) {
+        for (const comp of docType.compositions as UmbracoComposition[]) {
             if (comp.properties) {
                 properties = properties.concat(comp.properties);
             }
@@ -34,14 +35,14 @@ export async function GetBlockListElementTypes(
                 const compEndpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${compDocTypeId}`;
                 const compRaw = await CallUmbracoApi(compEndpoint, token, 'GET');
                 if (compRaw?.json?.properties) {
-                    properties = properties.concat(compRaw.json.properties);
+                    properties = properties.concat(compRaw.json.properties as UmbracoProperty[]);
                 }
             }
         }
     }
 
     // Find the BlockList property
-    const blockListProperty = properties.find((p: any) => p.alias === blockPropertyAlias);
+    const blockListProperty = properties.find((p) => p.alias === blockPropertyAlias);
 
     if (!blockListProperty) {
         new Notice(`BlockList property '${blockPropertyAlias}' not found on document type.`);
@@ -66,7 +67,7 @@ export async function GetBlockListElementTypes(
         return [];
     }
 
-    const dataType = dataTypeRaw.json;
+    const dataType = dataTypeRaw.json as UmbracoDataType;
 
     // Check if it's a BlockList or BlockGrid property
     const editorAlias = dataType.editorAlias || '';
@@ -83,8 +84,8 @@ export async function GetBlockListElementTypes(
 
     // Extract allowed element types from the BlockList configuration
     // The structure is: values[].value[] where alias === "blocks"
-    const values = dataType.values || [];
-    const blocksConfig = values.find((v: any) => v.alias === 'blocks');
+    const values: UmbracoDataTypeValue[] = dataType.values || [];
+    const blocksConfig = values.find((v) => v.alias === 'blocks');
 
     if (!blocksConfig || !blocksConfig.value || blocksConfig.value.length === 0) {
         new Notice('No element types configured for this BlockList property.');
@@ -93,8 +94,8 @@ export async function GetBlockListElementTypes(
 
     // Fetch all element types in parallel to improve performance
     const elementTypePromises = blocksConfig.value
-        .filter((block: any) => block.contentElementTypeKey)
-        .map(async (block: any) => {
+        .filter((block): block is UmbracoBlock & { contentElementTypeKey: string } => !!block.contentElementTypeKey)
+        .map(async (block) => {
             const elementTypeId = block.contentElementTypeKey;
             const etEndpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${elementTypeId}`;
             const etRaw = await CallUmbracoApi(etEndpoint, token, 'GET');
@@ -119,7 +120,7 @@ export async function GetElementTypeById(
     elementTypeId: string,
     websiteUrl: string,
     token: string
-): Promise<any> {
+): Promise<UmbracoDocType | null> {
     // Element types are document types, so use the document-type endpoint
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${elementTypeId}`;
 
@@ -129,14 +130,14 @@ export async function GetElementTypeById(
         return null;
     }
 
-    return elementTypeRaw.json;
+    return elementTypeRaw.json as UmbracoDocType;
 }
 
 /**
  * Auto-detect the best property for content on an element type
  * Since properties only have dataType.id (not editorAlias), we search by property name/alias
  */
-export function FindContentProperty(properties: any[]): any | null {
+export function FindContentProperty(properties: UmbracoProperty[]): UmbracoProperty | null {
     if (!properties || properties.length === 0) {
         return null;
     }
@@ -156,7 +157,7 @@ export function FindContentProperty(properties: any[]): any | null {
     // Try to find a property with a common content-related alias
     for (const name of contentPropertyNames) {
         const property = properties.find(
-            (p: any) => p.alias?.toLowerCase() === name.toLowerCase()
+            (p) => p.alias?.toLowerCase() === name.toLowerCase()
         );
         if (property) {
             return property;
@@ -166,7 +167,7 @@ export function FindContentProperty(properties: any[]): any | null {
     // If no match found by exact alias, try partial match
     for (const name of contentPropertyNames) {
         const property = properties.find(
-            (p: any) => p.alias?.toLowerCase().includes(name.toLowerCase())
+            (p) => p.alias?.toLowerCase().includes(name.toLowerCase())
         );
         if (property) {
             return property;
