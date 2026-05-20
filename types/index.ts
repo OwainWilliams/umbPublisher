@@ -1,5 +1,65 @@
 export type ContentMode = 'propertyEditor' | 'blockList' | 'blockGrid';
 
+export interface UmbracoProperty {
+	alias: string;
+	name?: string;
+	dataType?: {
+		id?: string;
+		editorAlias?: string;
+	};
+}
+
+export interface UmbracoComposition {
+	properties?: UmbracoProperty[];
+	documentType?: { id: string };
+	id?: string;
+}
+
+export interface UmbracoDocType {
+	id?: string;
+	name?: string;
+	alias?: string;
+	properties?: UmbracoProperty[];
+	compositions?: UmbracoComposition[];
+}
+
+export interface UmbracoDataTypeValue {
+	alias: string;
+	value?: UmbracoBlock[];
+}
+
+export interface UmbracoBlock {
+	contentElementTypeKey?: string;
+	label?: string;
+}
+
+export interface UmbracoDataType {
+	editorAlias?: string;
+	values?: UmbracoDataTypeValue[];
+}
+
+export interface UmbracoElementTypeSummary {
+	id: string;
+	name: string;
+	alias: string;
+}
+
+export interface UmbracoContentNode {
+	id: string;
+	depth: number;
+	variants: Array<{ name: string; culture?: string | null; segment?: string | null }>;
+	documentType: { id: string; alias?: string };
+}
+
+export interface UmbracoAllowedChildDocType {
+	id: string;
+	name: string;
+}
+
+export interface TokenResponse {
+	access_token: string;
+}
+
 export interface umbpublisherSettings {
     mySetting: string;
     websiteUrl: string;

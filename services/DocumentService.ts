@@ -1,8 +1,8 @@
 import { UmbracoApiService } from './UmbracoApiService';
 import { MediaService } from './MediaService';
 import { GenerateGuid } from '../methods/generateGuid';
-import { Notice, TFile, App } from 'obsidian';
-import { umbpublisherSettings } from '../types/index';
+import { Notice, TFile, App, Vault } from 'obsidian';
+import { umbpublisherSettings, UmbracoDocType, UmbracoProperty } from '../types/index';
 
 export interface CreateDocumentRequest {
     id: string;
@@ -12,7 +12,7 @@ export interface CreateDocumentRequest {
     values: Array<{
         editorAlias?: string;
         alias: string;
-        value: any;
+        value: unknown;
         culture: string | null;
         segment: string | null;
         entityType?: string;
@@ -37,7 +37,7 @@ export class DocumentService {
         this.mediaService = new MediaService(apiService);
     }
 
-    async processImagesInContent(content: string, vault: any): Promise<{ content: string; uploadedImages: string[] }> {
+    async processImagesInContent(content: string, vault: Vault): Promise<{ content: string; uploadedImages: string[] }> {
         const imageRegex = /!\[\[([^\]]+)\]\]/g;
         const uploadedImages: string[] = [];
         let processedContent = content;
@@ -50,7 +50,7 @@ export class DocumentService {
             try {
                 // Get all files in the vault to find the image
                 const files = vault.getFiles();
-                const imageFile = files.find((f: any) => 
+                const imageFile = files.find((f: TFile) => 
                     f.name === imageName || 
                     f.path === imageName ||
                     f.path.endsWith('/' + imageName)
@@ -91,8 +91,7 @@ export class DocumentService {
         contentAlias: string,
         sourceFile?: TFile,
         settings?: umbpublisherSettings
-    ): Promise<any> {
-        // Process images if source file is provided
+    ): Promise<unknown> {
         let processedContent = content;
         if (sourceFile) {
             // Pass the app.vault instead of sourceFile
@@ -136,36 +135,36 @@ export class DocumentService {
         parentId: string | null,
         titleAlias: string,
         contentAlias: string
-    ): Promise<any> {
+    ): Promise<unknown> {
         // First, get the document type details to understand the property structure
-        const docTypeDetails = await this.apiService.callApi(`/umbraco/management/api/v1/document-type/${docTypeId}`);
+        const docTypeDetails = await this.apiService.callApi<UmbracoDocType>(`/umbraco/management/api/v1/document-type/${docTypeId}`);
         
         if (!docTypeDetails) {
             throw new Error('Failed to fetch document type details');
         }
         
         // Build the values array with proper editor aliases
-        const values: any[] = [];
+        const values: CreateDocumentRequest['values'] = [];
         
         // Collect all properties: direct + from compositions
-        let properties: any[] = (docTypeDetails as any).properties || [];
-        if ((docTypeDetails as any).compositions) {
-            for (const comp of (docTypeDetails as any).compositions) {
+        let properties: UmbracoProperty[] = docTypeDetails.properties || [];
+        if (docTypeDetails.compositions) {
+            for (const comp of docTypeDetails.compositions) {
                 if (comp.properties) {
                     properties = properties.concat(comp.properties);
                 }
                 const compDocTypeId = comp.documentType?.id || comp.id;
                 if (compDocTypeId) {
-                    const compDetails = await this.apiService.callApi(`/umbraco/management/api/v1/document-type/${compDocTypeId}`);
-                    if (compDetails && (compDetails as any).properties) {
-                        properties = properties.concat((compDetails as any).properties);
+                    const compDetails = await this.apiService.callApi<UmbracoDocType>(`/umbraco/management/api/v1/document-type/${compDocTypeId}`);
+                    if (compDetails?.properties) {
+                        properties = properties.concat(compDetails.properties);
                     }
                 }
             }
         }
 
-        const titleProperty = properties.find((p: any) => p.alias === titleAlias);
-        const contentProperty = properties.find((p: any) => p.alias === contentAlias);
+        const titleProperty = properties.find((p) => p.alias === titleAlias);
+        const contentProperty = properties.find((p) => p.alias === contentAlias);
         
         // If we can't find the properties, let's try a simpler approach
         if (!titleProperty || !contentProperty) {
@@ -208,7 +207,7 @@ export class DocumentService {
         
         // Add default values for other properties if we found them
         if (properties.length > 0) {
-            properties.forEach((prop: any) => {
+            properties.forEach((prop) => {
                 if (prop.alias !== titleAlias && prop.alias !== contentAlias) {
                     const editorAlias = prop.dataType?.editorAlias;
                     
@@ -300,7 +299,7 @@ export class DocumentService {
         content: string,
         parentId: string | null,
         settings: umbpublisherSettings
-    ): Promise<any> {
+    ): Promise<unknown> {
         const isBlockGrid = settings.contentMode === 'blockGrid';
         const modeLabel = isBlockGrid ? 'Block Grid' : 'Block List';
 
@@ -337,31 +336,31 @@ export class DocumentService {
         };
 
         // Fetch document type to get property details
-        const docTypeDetails = await this.apiService.callApi(`/umbraco/management/api/v1/document-type/${docTypeId}`);
+        const docTypeDetails = await this.apiService.callApi<UmbracoDocType>(`/umbraco/management/api/v1/document-type/${docTypeId}`);
 
         if (!docTypeDetails) {
             throw new Error('Failed to fetch document type details');
         }
 
         // Collect all properties: direct + from compositions
-        let properties: any[] = (docTypeDetails as any).properties || [];
-        if ((docTypeDetails as any).compositions) {
-            for (const comp of (docTypeDetails as any).compositions) {
+        let properties: UmbracoProperty[] = docTypeDetails.properties || [];
+        if (docTypeDetails.compositions) {
+            for (const comp of docTypeDetails.compositions) {
                 if (comp.properties) {
                     properties = properties.concat(comp.properties);
                 }
                 const compDocTypeId = comp.documentType?.id || comp.id;
                 if (compDocTypeId) {
-                    const compDetails = await this.apiService.callApi(`/umbraco/management/api/v1/document-type/${compDocTypeId}`);
-                    if (compDetails && (compDetails as any).properties) {
-                        properties = properties.concat((compDetails as any).properties);
+                    const compDetails = await this.apiService.callApi<UmbracoDocType>(`/umbraco/management/api/v1/document-type/${compDocTypeId}`);
+                    if (compDetails?.properties) {
+                        properties = properties.concat(compDetails.properties);
                     }
                 }
             }
         }
 
         // Find the BlockList property
-        const blockListProperty = properties.find((p: any) => p.alias === settings.blockPropertyAlias);
+        const blockListProperty = properties.find((p) => p.alias === settings.blockPropertyAlias);
 
         if (!blockListProperty) {
             throw new Error(`BlockList property '${settings.blockPropertyAlias}' not found on document type.`);
@@ -369,7 +368,7 @@ export class DocumentService {
 
         // Build values array
         const editorAlias = isBlockGrid ? 'Umbraco.BlockGrid' : 'Umbraco.BlockList';
-        const values: any[] = [
+        const values: CreateDocumentRequest['values'] = [
             {
                 editorAlias: editorAlias,
                 alias: settings.blockPropertyAlias,
@@ -380,7 +379,7 @@ export class DocumentService {
         ];
 
         // Add other required properties (title, etc.)
-        const titleProperty = properties.find((p: any) => p.alias === settings.titleAlias);
+        const titleProperty = properties.find((p) => p.alias === settings.titleAlias);
         if (titleProperty) {
             values.push({
                 editorAlias: titleProperty.dataType?.editorAlias || 'Umbraco.TextBox',
@@ -392,9 +391,9 @@ export class DocumentService {
         }
 
         // Add default boolean and date properties
-        properties.forEach((prop: any) => {
+        properties.forEach((prop) => {
             if (prop.alias !== settings.blockPropertyAlias && prop.alias !== settings.titleAlias) {
-                const editorAlias = prop.dataType?.editorAlias;
+                const propEditorAlias = prop.dataType?.editorAlias;
 
                 if (prop.alias === 'isIndexable' || prop.alias === 'isFollowable') {
                     values.push({
@@ -412,7 +411,7 @@ export class DocumentService {
                         culture: null,
                         segment: null
                     });
-                } else if (prop.alias === 'articleDate' && editorAlias === 'Umbraco.DateTime') {
+                } else if (prop.alias === 'articleDate' && propEditorAlias === 'Umbraco.DateTime') {
                     values.push({
                         editorAlias: 'Umbraco.DateTime',
                         entityType: 'document-property-value',

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 
 import { Editor, MarkdownView, Notice, Plugin } from 'obsidian';
-import { DEFAULT_SETTINGS, umbpublisherSettings } from "./types/index";
+import { DEFAULT_SETTINGS, umbpublisherSettings, ContentMode } from "./types/index";
 import { SettingTab } from "./settings";
 import { umbpublisherIcons } from "./icons/icons";
 import { UmbracoApiService } from './services/UmbracoApiService';
@@ -13,7 +13,7 @@ import { GetUmbracoDocTypeById } from "./methods/getUmbracoDocType";
 
 
 export default class umbpublisher extends Plugin {
-    settings: umbpublisherSettings;
+    settings: umbpublisherSettings = DEFAULT_SETTINGS;
     private icons = new umbpublisherIcons();
     private apiService: UmbracoApiService | null = null;
     private documentService: DocumentService | null = null;
@@ -59,7 +59,7 @@ export default class umbpublisher extends Plugin {
         await this.publishToUmbraco(view);
     }
 
-    private handleEditorCommand(checking: boolean, editor: Editor, view: MarkdownView): boolean {
+    private handleEditorCommand(checking: boolean | any): boolean {
         if (checking) return true;
         
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -68,7 +68,7 @@ export default class umbpublisher extends Plugin {
             return false;
         }
         
-        this.publishToUmbraco(view).catch(error => 
+        this.publishToUmbraco(activeView).catch(error => 
             ErrorHandler.handle(error, 'Publishing to Umbraco')
         );
         return true;
@@ -101,6 +101,11 @@ export default class umbpublisher extends Plugin {
 
             if (!docType) {
                 new Notice('Failed to get document type. Please check your settings.');
+                return;
+            }
+
+            if (!docType.id) {
+                new Notice('Document type is missing an ID. Please re-fetch and try again.');
                 return;
             }
 
@@ -143,9 +148,11 @@ export default class umbpublisher extends Plugin {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, rawData);
 
         // Migration: convert old boolean useBlockList to new contentMode
-        if (rawData && (rawData as any).useBlockList !== undefined && (rawData as any).contentMode === undefined) {
-            this.settings.contentMode = (rawData as any).useBlockList ? 'blockList' : 'propertyEditor';
-            delete (this.settings as any).useBlockList;
+        type LegacySettings = Record<string, unknown> & { useBlockList?: boolean; contentMode?: ContentMode };
+        const legacyRaw = rawData as LegacySettings | null;
+        if (legacyRaw && legacyRaw.useBlockList !== undefined && legacyRaw.contentMode === undefined) {
+            this.settings.contentMode = legacyRaw.useBlockList ? 'blockList' : 'propertyEditor';
+            Reflect.deleteProperty(this.settings as object, 'useBlockList');
             await this.saveData(this.settings);
         }
 

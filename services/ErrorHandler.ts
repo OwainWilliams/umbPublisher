@@ -1,11 +1,11 @@
 import { Notice } from 'obsidian';
 
 export class ErrorHandler {
-    static handle(error: any, context: string = 'Operation'): void {
+    static handle(error: unknown, context: string = 'Operation'): void {
         let message = `${context} failed`;
         
-        if (error.message) {
-            message += `: ${error.message}`;
+        if (typeof error === 'object' && error !== null && 'message' in error) {
+            message += `: ${(error as { message: string }).message}`;
         } else if (typeof error === 'string') {
             message += `: ${error}`;
         }
@@ -13,7 +13,7 @@ export class ErrorHandler {
         new Notice(message);
     }
 
-    static async handleAsync(error: any, context: string = 'Operation'): Promise<void> {
+    static async handleAsync(error: unknown, context: string = 'Operation'): Promise<void> {
         return Promise.resolve(this.handle(error, context));
     }
 }

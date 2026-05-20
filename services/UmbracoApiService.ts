@@ -1,4 +1,5 @@
 import { requestUrl, Notice } from 'obsidian';
+import { TokenResponse } from '../types/index';
 
 export class UmbracoApiService {
     private bearerToken: string | null = null;
@@ -37,7 +38,7 @@ export class UmbracoApiService {
             });
 
             if (response.json) {
-                this.bearerToken = (response.json as any).access_token;
+                this.bearerToken = (response.json as TokenResponse).access_token;
                 return this.bearerToken;
             }
             return null;
@@ -47,14 +48,14 @@ export class UmbracoApiService {
         }
     }
 
-    async callApi<T>(endpoint: string, method: string = 'GET', body?: any): Promise<T | null> {
+    async callApi<T>(endpoint: string, method: string = 'GET', body?: unknown): Promise<T | null> {
         const token = await this.getBearerToken();
         if (!token) return null;
 
         const url = `${this.websiteUrl}${endpoint}`;
         
-        try {
-            const response = await requestUrl({
+        const response = await requestUrl(
+            {
                 url,
                 method,
                 headers: {
@@ -89,14 +90,10 @@ export class UmbracoApiService {
                 }
                 
                 throw new Error(`Invalid JSON response: ${response.text}`);
-            }
-
-        } catch (error) {
-            throw error;
+            }           
         }
-    }
 
-    async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string, id?: string): Promise<any> {
+    async uploadFile(endpoint: string, fileData: ArrayBuffer, fileName: string, mimeType: string, id?: string): Promise<unknown> {
         const token = await this.getBearerToken();
         if (!token) throw new Error('Failed to get bearer token');
 
@@ -177,14 +174,13 @@ export class UmbracoApiService {
         }
     }
 
-    async uploadBinary(endpoint: string, fileData: ArrayBuffer, mimeType: string): Promise<any> {
+    async uploadBinary(endpoint: string, fileData: ArrayBuffer, mimeType: string): Promise<unknown> {
         const token = await this.getBearerToken();
         if (!token) throw new Error('Failed to get bearer token');
 
         const url = `${this.websiteUrl}${endpoint}`;
         
-        try {
-            const response = await requestUrl({
+        const response = await requestUrl({
                 url,
                 method: 'PUT',  // Changed from POST to PUT
                 headers: {
@@ -210,12 +206,9 @@ export class UmbracoApiService {
             } catch (jsonError) {
                 return { success: true, status: response.status, rawResponse: response.text };
             }
-        } catch (error) {
-            throw error;
         }
-    }
 
-    clearToken(): void {
+        clearToken(): void {
         this.bearerToken = null;
     }
 }
