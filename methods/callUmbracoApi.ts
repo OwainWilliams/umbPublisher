@@ -1,4 +1,5 @@
-import { requestUrl, Notice } from 'obsidian';
+import { requestUrl, Notice, RequestUrlResponse } from 'obsidian';
+
 
 // Umbraco error response schema
 interface UmbracoErrorResponse {
@@ -9,7 +10,7 @@ interface UmbracoErrorResponse {
 	instance: string;
 }
 
-export async function CallUmbracoApi(endpoint: string, bearerToken: string,  method = 'GET', body?: any): Promise<any> {
+export async function CallUmbracoApi(endpoint: string, bearerToken: string,  method = 'GET', body?: unknown): Promise<RequestUrlResponse | null> {
 	
 	if (!bearerToken) {
 		new Notice('Bearer token is null. Please check your settings.');
@@ -28,29 +29,31 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 		});
 		return response; // Return the parsed JSON response
 	}
-	catch (error: any) {
+	catch (error: unknown) {
+		const err = error as { response?: string | Record<string, unknown>; status?: number; message?: string };
 
 		// Try to extract Umbraco-specific error details
 		let umbracoError: UmbracoErrorResponse | null = null;
 		try {
-			if (error.response && typeof error.response === 'string') {
-				umbracoError = JSON.parse(error.response) as UmbracoErrorResponse;
-			} else if (error.response && typeof error.response === 'object') {
-				umbracoError = error.response as UmbracoErrorResponse;
+			if (err.response && typeof err.response === 'string') {
+				umbracoError = JSON.parse(err.response) as UmbracoErrorResponse;
+			} else if (err.response && typeof err.response === 'object') {
+				umbracoError = err.response as unknown as UmbracoErrorResponse;
 			}
 		} catch (parseError) {
+			// If parsing fails, we can ignore it and show the generic error
 		}
 		
 		if (umbracoError) {
 			new Notice(`Umbraco API Error (${umbracoError.status}): ${umbracoError.title}\nDetail: ${umbracoError.detail}\nEndpoint: ${endpoint}`);
-		} else if (error.status === 404) {
+		} else if (err.status === 404) {
 			new Notice(`404 Error - Endpoint not found: ${endpoint}\nCheck if the Management API is enabled and the URL is correct.`);
-		} else if (error.status === 401) {
+		} else if (err.status === 401) {
 			new Notice('401 Error - Authentication failed. Check your client credentials.');
-		} else if (error.status === 403) {
+		} else if (err.status === 403) {
 			new Notice('403 Error - Access forbidden. Check your API permissions.');
 		} else {
-			new Notice(`API Error (${error.status || 'Unknown'}): ${error.message}\nEndpoint: ${endpoint}`);
+			new Notice(`API Error (${err.status || 'Unknown'}): ${err.message}\nEndpoint: ${endpoint}`);
 		}
 		
 		return null;

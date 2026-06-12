@@ -184,13 +184,13 @@ export class MediaService {
             }]
         };
 
-        const created = await this.apiService.callApi(
+        const created = await this.apiService.callApi<{ id?: string }>(
             '/umbraco/management/api/v1/media',
             'POST',
             createPayload
         );
 
-        const createdId = (created as any)?.id || folderId;
+        const createdId = created?.id || folderId;
 
         await this.waitForFolderCreation();
         const verifiedId = await this.verifyFolderCreation(createdId);

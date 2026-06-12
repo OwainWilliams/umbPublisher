@@ -2,7 +2,7 @@ import umbpublisher from "main";
 import { App, PluginSettingTab, Setting, requestUrl, Notice } from "obsidian";
 import { GetAllowedChildDocTypes, GetUmbracoDocTypeById } from "methods/getUmbracoDocType";
 import { GetBlockListElementTypes, GetElementTypeById } from "methods/getElementType";
-import { ContentMode } from "../types/index";
+import { ContentMode, TokenResponse, UmbracoContentNode, UmbracoAllowedChildDocType, UmbracoElementTypeSummary, UmbracoProperty } from "../types/index";
 
 async function getBearerToken(websiteUrl: string, clientId: string, clientSecret: string): Promise<string | null> {
     const tokenEndpoint = `${websiteUrl}/umbraco/management/api/v1/security/back-office/token`;
@@ -18,7 +18,7 @@ async function getBearerToken(websiteUrl: string, clientId: string, clientSecret
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: body.toString(),
         });
-        return (response.json as any).access_token;
+        return (response.json as TokenResponse).access_token;
     } catch (e) {
         new Notice('Failed to fetch bearer token');
         return null;
@@ -32,7 +32,7 @@ async function fetchAllContentNodes(
     token: string,
     parentId: string | null = null,
     depth: number = 0
-): Promise<any[]> {
+): Promise<UmbracoContentNode[]> {
     const endpoint = parentId
         ? `${websiteUrl}/umbraco/management/api/v1/tree/document/children?parentId=${parentId}`
         : `${websiteUrl}/umbraco/management/api/v1/tree/document/root?skip=0&take=100&foldersOnly=false`;
@@ -43,8 +43,8 @@ async function fetchAllContentNodes(
         headers: { 'Authorization': `Bearer ${token}` },
     });
 
-    const items = (response.json as any).items || [];
-    let allNodes: any[] = [];
+    const items = (response.json as { items?: UmbracoContentNode[] }).items || [];
+    let allNodes: UmbracoContentNode[] = [];
 
     for (const item of items) {
         // Add current node with depth for indentation
@@ -59,11 +59,11 @@ async function fetchAllContentNodes(
 
 export class SettingTab extends PluginSettingTab {
     plugin: umbpublisher;
-    private cachedNodes: any[] = []; // Store fetched nodes
-    private cachedAllowedChildDocTypes: any[] = []; // Store fetched allowed child document types
-    private cachedBlockListElementTypes: any[] = []; // Store fetched BlockList element types
-    private cachedElementTypeProperties: any[] = []; // Store fetched element type properties
-    private cachedDocTypeProperties: any[] = []; // Store fetched doc type properties for BlockList selection
+    private cachedNodes: UmbracoContentNode[] = [];
+    private cachedAllowedChildDocTypes: UmbracoAllowedChildDocType[] = [];
+    private cachedBlockListElementTypes: UmbracoElementTypeSummary[] = [];
+    private cachedElementTypeProperties: UmbracoProperty[] = [];
+    private cachedDocTypeProperties: UmbracoProperty[] = [];
 
     constructor(app: App, plugin: umbpublisher) {
         super(app, plugin);
@@ -73,13 +73,13 @@ export class SettingTab extends PluginSettingTab {
     /**
      * Fetches all properties from a document type including composed document types
      */
-    private async fetchAllDocTypeProperties(docTypeId: string, websiteUrl: string, token: string): Promise<any[]> {
+    private async fetchAllDocTypeProperties(docTypeId: string, websiteUrl: string, token: string): Promise<UmbracoProperty[]> {
         const docTypeDetails = await GetUmbracoDocTypeById(docTypeId, websiteUrl, token);
         if (!docTypeDetails) {
             return [];
         }
 
-        let allProps: any[] = docTypeDetails.properties || [];
+        let allProps: UmbracoProperty[] = docTypeDetails.properties || [];
         if (docTypeDetails.compositions) {
             for (const comp of docTypeDetails.compositions) {
                 if (comp.properties) {
@@ -104,10 +104,7 @@ export class SettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        // Prevent dropdowns from stretching the settings layout
-        const style = containerEl.createEl('style');
-        style.textContent = `.setting-item-control select { max-width: 200px; }`;
-
+        
         new Setting(containerEl)
             .setName('Website URL')
             .setDesc('The URL of the Umbraco website e.g. https://example.com')
@@ -157,12 +154,12 @@ export class SettingTab extends PluginSettingTab {
                     this.cachedNodes = await fetchAllContentNodes(websiteUrl, token);
                     if (parentNodeDropdown) {
                         parentNodeDropdown.innerHTML = '';
-                        const rootOption = document.createElement('option');
+                        const rootOption = createEl('option');
                         rootOption.value = '';
                         rootOption.text = '[Select Node]';
                         parentNodeDropdown.appendChild(rootOption);
                         this.cachedNodes.forEach(node => {
-                            const option = document.createElement('option');
+                            const option = createEl('option');
                             option.value = node.id;
                             option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
                             parentNodeDropdown?.appendChild(option);
@@ -175,13 +172,13 @@ export class SettingTab extends PluginSettingTab {
                 parentNodeDropdown = dropdown.selectEl;
                 // Populate dropdown from cache if available
                 parentNodeDropdown.innerHTML = '';
-                const rootOption = document.createElement('option');
+                const rootOption = createEl('option');
                 rootOption.value = '';
                 rootOption.text = '[Select Node]';
                 parentNodeDropdown.appendChild(rootOption);
                 if (this.cachedNodes.length > 0) {
                     this.cachedNodes.forEach(node => {
-                        const option = document.createElement('option');
+                        const option = createEl('option');
                         option.value = node.id;
                         option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
                         parentNodeDropdown?.appendChild(option);
@@ -235,13 +232,13 @@ export class SettingTab extends PluginSettingTab {
 
                         if (childDocTypeDropdown) {
                             childDocTypeDropdown.innerHTML = '';
-                            const defaultOption = document.createElement('option');
+                            const defaultOption = createEl('option');
                             defaultOption.value = '';
                             defaultOption.text = '[Select Document Type]';
                             childDocTypeDropdown.appendChild(defaultOption);
 
                             this.cachedAllowedChildDocTypes.forEach(docType => {
-                                const option = document.createElement('option');
+                                const option = createEl('option');
                                 option.value = docType.id;
                                 option.text = docType.name;
                                 childDocTypeDropdown?.appendChild(option);
@@ -256,14 +253,14 @@ export class SettingTab extends PluginSettingTab {
                     
                     // Populate dropdown from cache if available
                     childDocTypeDropdown.innerHTML = '';
-                    const defaultOption = document.createElement('option');
+                    const defaultOption = createEl('option');
                     defaultOption.value = '';
                     defaultOption.text = '[Select Document Type]';
                     childDocTypeDropdown.appendChild(defaultOption);
 
                     if (this.cachedAllowedChildDocTypes.length > 0) {
                         this.cachedAllowedChildDocTypes.forEach(docType => {
-                            const option = document.createElement('option');
+                            const option = createEl('option');
                             option.value = docType.id;
                             option.text = docType.name;
                             childDocTypeDropdown?.appendChild(option);
@@ -283,8 +280,13 @@ export class SettingTab extends PluginSettingTab {
                                 const docTypeDetails = await GetUmbracoDocTypeById(value, websiteUrl, token);
                                 
                                 if (docTypeDetails) {
-                                    this.plugin.settings.blogDocTypeId = docTypeDetails.id;
-                                    this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
+									if (docTypeDetails.id && docTypeDetails.alias) {
+										this.plugin.settings.blogDocTypeId = docTypeDetails.id;
+										this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
+									} else {
+										new Notice('Selected document type is missing required fields (id/alias).');
+										return;
+									}
                                 }
                             }
                         } else {
@@ -358,13 +360,13 @@ export class SettingTab extends PluginSettingTab {
 							if (!dd) continue;
 							const currentVal = dd.value;
 							dd.innerHTML = '';
-							const defaultOption = document.createElement('option');
+							const defaultOption = createEl('option');
 							defaultOption.value = '';
 							defaultOption.text = '[Select Property]';
 							dd.appendChild(defaultOption);
 
 							this.cachedDocTypeProperties.forEach((prop: any) => {
-								const option = document.createElement('option');
+								const option = createEl('option');
 								option.value = prop.alias;
 								option.text = prop.name || prop.alias;
 								dd.appendChild(option);
@@ -404,14 +406,14 @@ export class SettingTab extends PluginSettingTab {
 					titleDropdown = dropdown.selectEl;
 
 					titleDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
+					const defaultOption = createEl('option');
 					defaultOption.value = '';
 					defaultOption.text = '[Select Property]';
 					titleDropdown.appendChild(defaultOption);
 
 					if (this.cachedDocTypeProperties.length > 0) {
 						this.cachedDocTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							titleDropdown?.appendChild(option);
@@ -433,14 +435,14 @@ export class SettingTab extends PluginSettingTab {
 					contentDropdown = dropdown.selectEl;
 
 					contentDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
+					const defaultOption = createEl('option');
 					defaultOption.value = '';
 					defaultOption.text = '[Select Property]';
 					contentDropdown.appendChild(defaultOption);
 
 					if (this.cachedDocTypeProperties.length > 0) {
 						this.cachedDocTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							contentDropdown?.appendChild(option);
@@ -519,13 +521,13 @@ export class SettingTab extends PluginSettingTab {
 
 					if (blockPropDropdown) {
 						blockPropDropdown.innerHTML = '';
-						const defaultOption = document.createElement('option');
+						const defaultOption = createEl('option');
 						defaultOption.value = '';
 						defaultOption.text = '[Select Property]';
 						blockPropDropdown.appendChild(defaultOption);
 
 						this.cachedDocTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							blockPropDropdown?.appendChild(option);
@@ -556,14 +558,14 @@ export class SettingTab extends PluginSettingTab {
 				blockPropDropdown = dropdown.selectEl;
 
 				blockPropDropdown.innerHTML = '';
-				const defaultOption = document.createElement('option');
+				const defaultOption = createEl('option');
 				defaultOption.value = '';
 				defaultOption.text = '[Select Property]';
 				blockPropDropdown.appendChild(defaultOption);
 
 				if (this.cachedDocTypeProperties.length > 0) {
 					this.cachedDocTypeProperties.forEach((prop: any) => {
-						const option = document.createElement('option');
+						const option = createEl('option');
 						option.value = prop.alias;
 						option.text = prop.name || prop.alias;
 						blockPropDropdown?.appendChild(option);
@@ -604,13 +606,13 @@ export class SettingTab extends PluginSettingTab {
 
 					if (elementTypeDropdown) {
 						elementTypeDropdown.innerHTML = '';
-						const defaultOption = document.createElement('option');
+						const defaultOption = createEl('option');
 						defaultOption.value = '';
 						defaultOption.text = '[Select Element Type]';
 						elementTypeDropdown.appendChild(defaultOption);
 
 						this.cachedBlockListElementTypes.forEach(elementType => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = elementType.id;
 							option.text = elementType.name || elementType.alias;
 							elementTypeDropdown?.appendChild(option);
@@ -624,14 +626,14 @@ export class SettingTab extends PluginSettingTab {
 				elementTypeDropdown = dropdown.selectEl;
 
 				elementTypeDropdown.innerHTML = '';
-				const defaultOption = document.createElement('option');
+				const defaultOption = createEl('option');
 				defaultOption.value = '';
 				defaultOption.text = '[Select Element Type]';
 				elementTypeDropdown.appendChild(defaultOption);
 
 				if (this.cachedBlockListElementTypes.length > 0) {
 					this.cachedBlockListElementTypes.forEach(elementType => {
-						const option = document.createElement('option');
+						const option = createEl('option');
 						option.value = elementType.id;
 						option.text = elementType.name || elementType.alias;
 						elementTypeDropdown?.appendChild(option);
@@ -649,8 +651,13 @@ export class SettingTab extends PluginSettingTab {
 							const elementTypeDetails = await GetElementTypeById(value, websiteUrl, token);
 
 							if (elementTypeDetails) {
-								this.plugin.settings.blockElementTypeId = elementTypeDetails.id;
-								this.plugin.settings.blockElementTypeAlias = elementTypeDetails.alias;
+								if (elementTypeDetails.id && elementTypeDetails.alias) {
+									this.plugin.settings.blockElementTypeId = elementTypeDetails.id;
+									this.plugin.settings.blockElementTypeAlias = elementTypeDetails.alias;
+								} else {
+									new Notice('Selected element type is missing required fields (id/alias).');
+									return;
+								}
 								this.cachedElementTypeProperties = elementTypeDetails.properties || [];
 							}
 						}
@@ -692,13 +699,13 @@ export class SettingTab extends PluginSettingTab {
 
 						if (contentPropDropdown) {
 							contentPropDropdown.innerHTML = '';
-							const defaultOption = document.createElement('option');
+							const defaultOption = createEl('option');
 							defaultOption.value = '';
 							defaultOption.text = '[Select Property]';
 							contentPropDropdown.appendChild(defaultOption);
 
 							this.cachedElementTypeProperties.forEach((prop: any) => {
-								const option = document.createElement('option');
+								const option = createEl('option');
 								option.value = prop.alias;
 								option.text = prop.name || prop.alias;
 								contentPropDropdown?.appendChild(option);
@@ -712,14 +719,14 @@ export class SettingTab extends PluginSettingTab {
 					contentPropDropdown = dropdown.selectEl;
 
 					contentPropDropdown.innerHTML = '';
-					const defaultOption = document.createElement('option');
+					const defaultOption = createEl('option');
 					defaultOption.value = '';
 					defaultOption.text = '[Select Property]';
 					contentPropDropdown.appendChild(defaultOption);
 
 					if (this.cachedElementTypeProperties.length > 0) {
 						this.cachedElementTypeProperties.forEach((prop: any) => {
-							const option = document.createElement('option');
+							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
 							contentPropDropdown?.appendChild(option);
