@@ -328,6 +328,7 @@ export class SettingTab extends PluginSettingTab {
 		if (this.plugin.settings.contentMode === 'propertyEditor' && this.plugin.settings.blogDocTypeId) {
 			let titleDropdown: HTMLSelectElement | null = null;
 			let contentDropdown: HTMLSelectElement | null = null;
+			let tagsDropdownEl: HTMLSelectElement | null = null;
 
 			new Setting(containerEl)
 				.setName('Fetch document type properties')
@@ -352,7 +353,7 @@ export class SettingTab extends PluginSettingTab {
 
 						this.cachedDocTypeProperties = allProps;
 
-						// Populate both dropdowns
+						// Populate title and content dropdowns
 						for (const dd of [titleDropdown, contentDropdown]) {
 							if (!dd) continue;
 							const currentVal = dd.value;
@@ -370,6 +371,24 @@ export class SettingTab extends PluginSettingTab {
 							});
 
 							dd.value = currentVal;
+						}
+
+						// Populate tags dropdown (has a [None] option instead of [Select Property])
+						if (tagsDropdownEl) {
+							tagsDropdownEl.innerHTML = '';
+							const noneOption = document.createElement('option');
+							noneOption.value = '';
+							noneOption.text = '[None]';
+							tagsDropdownEl.appendChild(noneOption);
+
+							this.cachedDocTypeProperties.forEach((prop: any) => {
+								const option = document.createElement('option');
+								option.value = prop.alias;
+								option.text = prop.name || prop.alias;
+								tagsDropdownEl?.appendChild(option);
+							});
+
+							tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
 						}
 
 						// Restore saved values
@@ -432,6 +451,35 @@ export class SettingTab extends PluginSettingTab {
 
 					dropdown.onChange(async (value) => {
 						this.plugin.settings.blogContentAlias = value;
+						await this.plugin.saveSettings();
+					});
+				});
+
+			new Setting(containerEl)
+				.setName('Tags property')
+				.setDesc('Select the tags property on your document type (optional)')
+				.addDropdown(dropdown => {
+					tagsDropdownEl = dropdown.selectEl;
+
+					tagsDropdownEl.innerHTML = '';
+					const noneOption = document.createElement('option');
+					noneOption.value = '';
+					noneOption.text = '[None]';
+					tagsDropdownEl.appendChild(noneOption);
+
+					if (this.cachedDocTypeProperties.length > 0) {
+						this.cachedDocTypeProperties.forEach((prop: any) => {
+							const option = document.createElement('option');
+							option.value = prop.alias;
+							option.text = prop.name || prop.alias;
+							tagsDropdownEl?.appendChild(option);
+						});
+					}
+
+					tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
+
+					dropdown.onChange(async (value) => {
+						this.plugin.settings.tagsAlias = value;
 						await this.plugin.saveSettings();
 					});
 				});
@@ -668,5 +716,35 @@ export class SettingTab extends PluginSettingTab {
 					});
 				});
 		}
+
+		// Tags property dropdown - maps Obsidian frontmatter tags to an Umbraco Tags property
+		new Setting(containerEl)
+			.setName('Tags property')
+			.setDesc('Select the tags property on your document type (optional)')
+			.addDropdown(dropdown => {
+				const tagsDropdown = dropdown.selectEl;
+
+				tagsDropdown.innerHTML = '';
+				const noneOption = document.createElement('option');
+				noneOption.value = '';
+				noneOption.text = '[None]';
+				tagsDropdown.appendChild(noneOption);
+
+				if (this.cachedDocTypeProperties.length > 0) {
+					this.cachedDocTypeProperties.forEach((prop: any) => {
+						const option = document.createElement('option');
+						option.value = prop.alias;
+						option.text = prop.name || prop.alias;
+						tagsDropdown.appendChild(option);
+					});
+				}
+
+				tagsDropdown.value = this.plugin.settings.tagsAlias || '';
+
+				dropdown.onChange(async (value) => {
+					this.plugin.settings.tagsAlias = value;
+					await this.plugin.saveSettings();
+				});
+			});
 	}
 }

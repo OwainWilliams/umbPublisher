@@ -128,8 +128,9 @@ export default class umbpublisher extends Plugin {
                 this.settings.blogParentNodeId,
                 this.settings.titleAlias,
                 this.settings.blogContentAlias,
-                currentFile,  // Pass the file here
-                this.settings  // Pass settings for BlockList mode
+                currentFile,
+                this.settings,
+                content.tags
             );
 
             new Notice('Document created successfully!');

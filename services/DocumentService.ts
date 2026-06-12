@@ -90,7 +90,8 @@ export class DocumentService {
         titleAlias: string,
         contentAlias: string,
         sourceFile?: TFile,
-        settings?: umbpublisherSettings
+        settings?: umbpublisherSettings,
+        tags: string[] = []
     ): Promise<any> {
         // Process images if source file is provided
         let processedContent = content;
@@ -110,7 +111,8 @@ export class DocumentService {
                 title,
                 processedContent,
                 parentId,
-                settings
+                settings,
+                tags
             );
         } else {
             return this.createDocumentLegacy(
@@ -120,7 +122,9 @@ export class DocumentService {
                 processedContent,
                 parentId,
                 titleAlias,
-                contentAlias
+                contentAlias,
+                settings?.tagsAlias || '',
+                tags
             );
         }
     }
@@ -135,7 +139,9 @@ export class DocumentService {
         content: string,
         parentId: string | null,
         titleAlias: string,
-        contentAlias: string
+        contentAlias: string,
+        tagsAlias: string = '',
+        tags: string[] = []
     ): Promise<any> {
         // First, get the document type details to understand the property structure
         const docTypeDetails = await this.apiService.callApi(`/umbraco/management/api/v1/document-type/${docTypeId}`);
@@ -211,7 +217,7 @@ export class DocumentService {
             properties.forEach((prop: any) => {
                 if (prop.alias !== titleAlias && prop.alias !== contentAlias) {
                     const editorAlias = prop.dataType?.editorAlias;
-                    
+
                     // Add common default properties
                     if (prop.alias === 'isIndexable' || prop.alias === 'isFollowable') {
                         values.push({
@@ -240,6 +246,17 @@ export class DocumentService {
                         });
                     }
                 }
+            });
+        }
+
+        // Add tags property if configured and tags exist
+        if (tagsAlias && tags.length > 0) {
+            values.push({
+                editorAlias: 'Umbraco.Tags',
+                alias: tagsAlias,
+                value: tags,
+                culture: null,
+                segment: null
             });
         }
 
@@ -299,7 +316,8 @@ export class DocumentService {
         title: string,
         content: string,
         parentId: string | null,
-        settings: umbpublisherSettings
+        settings: umbpublisherSettings,
+        tags: string[] = []
     ): Promise<any> {
         const isBlockGrid = settings.contentMode === 'blockGrid';
         const modeLabel = isBlockGrid ? 'Block Grid' : 'Block List';
@@ -424,6 +442,17 @@ export class DocumentService {
                 }
             }
         });
+
+        // Add tags property if configured and tags exist
+        if (settings.tagsAlias && tags.length > 0) {
+            values.push({
+                editorAlias: 'Umbraco.Tags',
+                alias: settings.tagsAlias,
+                value: tags,
+                culture: null,
+                segment: null
+            });
+        }
 
         const documentRequest: CreateDocumentRequest = {
             id: documentId,
