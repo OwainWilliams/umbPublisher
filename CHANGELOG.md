@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Updated version references across package configuration files
+- Removed unused dependencies: `dotenv`, `node-fetch`, `@types/node-fetch`, `builtin-modules`
+  - Plugin already uses Obsidian's `requestUrl` API instead of node-fetch
+  - Build configuration simplified with explicit Node.js built-ins list in esbuild config
+  - Resolves Obsidian compatibility flags for Node.js-specific packages
 
 ## [1.4.0] - Previous Release
 

@@ -492,6 +492,7 @@ export class SettingTab extends PluginSettingTab {
 	 */
 	private renderBlockSettings(containerEl: HTMLElement, modeLabel: string): void {
 		let blockPropDropdown: HTMLSelectElement | null = null;
+		let tagsDropdownEl: HTMLSelectElement | null = null;
 
 		new Setting(containerEl)
 			.setName(`${modeLabel} property`)
@@ -531,6 +532,23 @@ export class SettingTab extends PluginSettingTab {
 						});
 
 						blockPropDropdown.value = this.plugin.settings.blockPropertyAlias || '';
+					}
+
+					if (tagsDropdownEl) {
+						tagsDropdownEl.innerHTML = '';
+						const noneOption = document.createElement('option');
+						noneOption.value = '';
+						noneOption.text = '[None]';
+						tagsDropdownEl.appendChild(noneOption);
+
+						this.cachedDocTypeProperties.forEach((prop: any) => {
+							const option = document.createElement('option');
+							option.value = prop.alias;
+							option.text = prop.name || prop.alias;
+							tagsDropdownEl?.appendChild(option);
+						});
+
+						tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
 					}
 				});
 			})
@@ -722,24 +740,24 @@ export class SettingTab extends PluginSettingTab {
 			.setName('Tags property')
 			.setDesc('Select the tags property on your document type (optional)')
 			.addDropdown(dropdown => {
-				const tagsDropdown = dropdown.selectEl;
+				tagsDropdownEl = dropdown.selectEl;
 
-				tagsDropdown.innerHTML = '';
+				tagsDropdownEl.innerHTML = '';
 				const noneOption = document.createElement('option');
 				noneOption.value = '';
 				noneOption.text = '[None]';
-				tagsDropdown.appendChild(noneOption);
+				tagsDropdownEl.appendChild(noneOption);
 
 				if (this.cachedDocTypeProperties.length > 0) {
 					this.cachedDocTypeProperties.forEach((prop: any) => {
 						const option = document.createElement('option');
 						option.value = prop.alias;
 						option.text = prop.name || prop.alias;
-						tagsDropdown.appendChild(option);
+						tagsDropdownEl?.appendChild(option);
 					});
 				}
 
-				tagsDropdown.value = this.plugin.settings.tagsAlias || '';
+				tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
 
 				dropdown.onChange(async (value) => {
 					this.plugin.settings.tagsAlias = value;
