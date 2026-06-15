@@ -1,6 +1,6 @@
 {
 	"name": "umbpublisher",
-	"version": "1.5.0",
+	"version": "1.5.1",
 	"description": "Send Obsidian Notes to Umbraco CMS via Management API",
 	"main": "main.js",
 	"scripts": {
@@ -15,16 +15,10 @@
 		"@types/node": "^16.18.126",
 		"@typescript-eslint/eslint-plugin": "5.29.0",
 		"@typescript-eslint/parser": "5.29.0",
-		"esbuild": "0.17.3",
+		"esbuild": "^0.28.1",
 		"obsidian": "^1.8.7",
 		"tslib": "2.4.0",
 		"typescript": "4.7.4"
-	},
-	"dependencies": {
-		"@umbraco/headless-client": "^0.9.0",
-		"crypto": "^1.0.1",
-		"gray-matter": "^4.0.3",
-		"markdown-it": "^14.1.0"
 	},
 	"repository": {
 		"type": "git",

@@ -200,7 +200,7 @@ export class MediaService {
     }
 
     private async waitForFolderCreation(): Promise<void> {
-        await new Promise(resolve => setTimeout(resolve, MediaService.FOLDER_CREATION_DELAY));
+        await new Promise(resolve => window.setTimeout(resolve, MediaService.FOLDER_CREATION_DELAY));
     }
 
     private async verifyFolderCreation(createdId: string): Promise<string> {

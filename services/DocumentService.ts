@@ -75,7 +75,8 @@ export class DocumentService {
                 const replacement = `<img src="${mediaUrl}" alt="${imageName}" />`;
                 processedContent = processedContent.replace(match[0], replacement);
 
-            } catch (error) {
+            } catch {
+                // Image not found or upload failed — skip and continue
             }
         }
 
@@ -92,7 +93,7 @@ export class DocumentService {
         sourceFile?: TFile,
         settings?: umbpublisherSettings,
         tags: string[] = []
-    ): Promise<any> {
+    ): Promise<unknown> {
         let processedContent = content;
         if (sourceFile) {
             // Pass the app.vault instead of sourceFile
@@ -141,7 +142,7 @@ export class DocumentService {
         contentAlias: string,
         tagsAlias: string = '',
         tags: string[] = []
-    ): Promise<any> {
+    ): Promise<unknown> {
         // First, get the document type details to understand the property structure
         const docTypeDetails = await this.apiService.callApi<UmbracoDocType>(`/umbraco/management/api/v1/document-type/${docTypeId}`);
         
@@ -317,7 +318,7 @@ export class DocumentService {
         parentId: string | null,
         settings: umbpublisherSettings,
         tags: string[] = []
-    ): Promise<any> {
+    ): Promise<unknown> {
         const isBlockGrid = settings.contentMode === 'blockGrid';
         const modeLabel = isBlockGrid ? 'Block Grid' : 'Block List';
 
