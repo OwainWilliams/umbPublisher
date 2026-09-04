@@ -14,12 +14,13 @@ interface MediaItem {
 
 interface MediaTreeResponse {
     items?: MediaItem[];
+    total?: number;
 }
 
 interface MediaDetailsResponse {
     values?: Array<{
         alias: string;
-        value?: {
+        value?: string | {
             src?: string;
             url?: string;
         };
@@ -36,6 +37,8 @@ export class MediaService {
     private static readonly OBSIDIAN_FOLDER_NAME = 'Obsidian';
     private static readonly UMBRACO_FILE_ALIAS = 'umbracoFile';
     private static readonly FOLDER_CREATION_DELAY = 1000;
+    private static readonly TREE_PAGE_SIZE = 100;
+    private static readonly TREE_MAX_PAGES = 50;
 
     private folderMediaTypeId: string | null = null;
     private imageMediaTypeId: string | null = null;
@@ -80,7 +83,8 @@ export class MediaService {
         ) as MediaDetailsResponse;
 
         const umbracoFile = media?.values?.find(v => v.alias === MediaService.UMBRACO_FILE_ALIAS);
-        const url = umbracoFile?.value?.src || umbracoFile?.value?.url;
+        const value = umbracoFile?.value;
+        const url = typeof value === 'string' ? value : (value?.src || value?.url);
 
         if (!url) {
             throw new Error(`Media URL not found for ID: ${mediaId}`);
@@ -147,20 +151,47 @@ export class MediaService {
         return imageType?.id || null;
     }
 
-    private async findExistingObsidianFolder(): Promise<string | null> {
-        try {
+    /**
+     * The media tree endpoints are paged, so a single unpaged request only ever
+     * sees the first page - walk them all so existing items are actually found.
+     */
+    private async fetchMediaTreeItems(endpoint: string): Promise<MediaItem[]> {
+        const separator = endpoint.includes('?') ? '&' : '?';
+        const items: MediaItem[] = [];
+
+        for (let page = 0; page < MediaService.TREE_MAX_PAGES; page++) {
+            const skip = page * MediaService.TREE_PAGE_SIZE;
             const response = await this.apiService.callApi(
-                '/umbraco/management/api/v1/tree/media/root'
+                `${endpoint}${separator}skip=${skip}&take=${MediaService.TREE_PAGE_SIZE}`
             ) as MediaTreeResponse;
 
-            if (!response?.items) {
-                return null;
+            const pageItems = response?.items;
+            if (!pageItems || pageItems.length === 0) {
+                break;
             }
 
-            const obsidianFolder = response.items.find(item =>
-                item.name === MediaService.OBSIDIAN_FOLDER_NAME ||
-                item.variants?.[0]?.name === MediaService.OBSIDIAN_FOLDER_NAME
-            );
+            items.push(...pageItems);
+
+            if (pageItems.length < MediaService.TREE_PAGE_SIZE || items.length >= (response.total ?? items.length)) {
+                break;
+            }
+        }
+
+        return items;
+    }
+
+    private matchesName(item: MediaItem, name: string): boolean {
+        if (item.name === name) {
+            return true;
+        }
+
+        return (item.variants || []).some(variant => variant.name === name);
+    }
+
+    private async findExistingObsidianFolder(): Promise<string | null> {
+        try {
+            const items = await this.fetchMediaTreeItems('/umbraco/management/api/v1/tree/media/root');
+            const obsidianFolder = items.find(item => this.matchesName(item, MediaService.OBSIDIAN_FOLDER_NAME));
 
             return obsidianFolder?.id || null;
         } catch {
@@ -204,12 +235,10 @@ export class MediaService {
     }
 
     private async verifyFolderCreation(createdId: string): Promise<string> {
-        const verifyResponse = await this.apiService.callApi(
-            '/umbraco/management/api/v1/tree/media/root'
-        ) as MediaTreeResponse;
+        const items = await this.fetchMediaTreeItems('/umbraco/management/api/v1/tree/media/root');
 
-        const verifiedFolder = verifyResponse?.items?.find(item =>
-            item.id === createdId || item.name === MediaService.OBSIDIAN_FOLDER_NAME
+        const verifiedFolder = items.find(item =>
+            item.id === createdId || this.matchesName(item, MediaService.OBSIDIAN_FOLDER_NAME)
         );
 
         return verifiedFolder?.id || createdId;
@@ -272,7 +301,12 @@ export class MediaService {
             '.png': 'image/png',
             '.gif': 'image/gif',
             '.webp': 'image/webp',
-            '.svg': 'image/svg+xml'
+            '.svg': 'image/svg+xml',
+            '.bmp': 'image/bmp',
+            '.avif': 'image/avif',
+            '.tif': 'image/tiff',
+            '.tiff': 'image/tiff',
+            '.ico': 'image/x-icon'
         };
 
         return mimeTypes[extension.toLowerCase()] || 'application/octet-stream';
@@ -280,17 +314,11 @@ export class MediaService {
 
     private async findMediaByName(fileName: string, parentFolderId: string): Promise<string | null> {
         try {
-            const response = await this.apiService.callApi(
+            const items = await this.fetchMediaTreeItems(
                 `/umbraco/management/api/v1/tree/media/children?parentId=${parentFolderId}`
-            ) as MediaTreeResponse;
-
-            if (!response?.items) {
-                return null;
-            }
-
-            const existing = response.items.find(item =>
-                item.name === fileName || item.variants?.[0]?.name === fileName
             );
+
+            const existing = items.find(item => this.matchesName(item, fileName));
 
             return existing?.id || null;
         } catch {

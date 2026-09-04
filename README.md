@@ -70,7 +70,10 @@ Once configured, you can publish the currently active markdown note to Umbraco i
 
 The plugin will:
 - Parse the markdown content from your active note
-- Upload any embedded images (`![[image.png]]`) to the Umbraco media library
+- Upload any embedded local images to the Umbraco media library, into an "Obsidian" folder
+  - Both Obsidian embeds (`![[image.png]]`, including `|400` sizing and `#subpath` suffixes) and standard markdown images (`![alt](images/image.png)`) are supported
+  - Each embed is replaced with an `<img>` tag pointing at the uploaded media, and images already in the media library are reused rather than re-uploaded
+  - Images already hosted elsewhere (`http(s)://`, `data:`) are left untouched, and anything that fails to upload is reported in a notice
 - Create a new document in Umbraco under your configured parent node
 
 ## Upgrading from v1.3.x

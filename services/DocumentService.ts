@@ -1,7 +1,7 @@
 import { UmbracoApiService } from './UmbracoApiService';
 import { MediaService } from './MediaService';
 import { GenerateGuid } from '../methods/generateGuid';
-import { Notice, TFile, App, Vault } from 'obsidian';
+import { Notice, TFile, App } from 'obsidian';
 import { umbpublisherSettings, UmbracoDocType, UmbracoProperty } from '../types/index';
 
 export interface CreateDocumentRequest {
@@ -30,56 +30,204 @@ export interface CreateDocumentRequest {
     }>;
 }
 
+interface ImageEmbed {
+    /** The exact embed text as it appears in the note. */
+    raw: string;
+    /** The link target, with any size/subpath suffix removed and URL-decoded. */
+    target: string;
+    /** Alt text supplied by the author, if any. */
+    alt: string;
+}
+
 export class DocumentService {
+    private static readonly WIKI_EMBED_REGEX = /!\[\[([^\]]+)\]\]/g;
+    private static readonly MARKDOWN_IMAGE_REGEX = /!\[([^\]]*)\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g;
+    private static readonly IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'tif', 'tiff', 'ico'];
+
     private mediaService: MediaService;
 
     constructor(private apiService: UmbracoApiService, private app: App) {
         this.mediaService = new MediaService(apiService);
     }
 
-    async processImagesInContent(content: string, vault: Vault): Promise<{ content: string; uploadedImages: string[] }> {
-        const imageRegex = /!\[\[([^\]]+)\]\]/g;
+    /**
+     * Finds every locally embedded image in the note, uploads it to the Umbraco
+     * media library and swaps the embed for an <img> tag pointing at the media URL.
+     *
+     * Handles both Obsidian wiki embeds (`![[image.png]]`, including `|size` and
+     * `#subpath` suffixes) and standard markdown images (`![alt](path/image.png)`,
+     * including URL-encoded paths, <angle brackets> and link titles).
+     */
+    async processImagesInContent(
+        content: string,
+        sourcePath = ''
+    ): Promise<{ content: string; uploadedImages: string[]; failedImages: string[] }> {
+        const embeds = this.extractImageEmbeds(content);
         const uploadedImages: string[] = [];
-        let processedContent = content;
+        const failedImages: string[] = [];
 
-        const matches = Array.from(processedContent.matchAll(imageRegex));
-        
-        for (const match of matches) {
-            const imageName = match[1];
+        if (embeds.length === 0) {
+            return { content, uploadedImages, failedImages };
+        }
 
+        new Notice(`Uploading ${embeds.length} image${embeds.length === 1 ? '' : 's'} to Umbraco...`);
+
+        const replacements = new Map<string, string>();
+        const urlCache = new Map<string, string>();
+
+        for (const embed of embeds) {
             try {
-                // Get all files in the vault to find the image
-                const files = vault.getFiles();
-                const imageFile = files.find((f: TFile) => 
-                    f.name === imageName || 
-                    f.path === imageName ||
-                    f.path.endsWith('/' + imageName)
-                );
-                
+                const imageFile = this.resolveImageFile(embed.target, sourcePath);
+
                 if (!imageFile) {
+                    failedImages.push(`${embed.target} (not found in vault)`);
                     continue;
                 }
 
-                const arrayBuffer = await vault.adapter.readBinary(imageFile.path);
-                const fileName = imageFile.name;
-                
-                const obsidianFolderId = await this.mediaService.getOrCreateObsidianFolder();
-                const mediaId = await this.mediaService.uploadImage(arrayBuffer, fileName, obsidianFolderId);
-                
-                // Get the media URL
-                const mediaUrl = await this.mediaService.getMediaUrl(mediaId);
-                
-                uploadedImages.push(mediaId);
-                
-                // Replace markdown image with HTML img tag using the media URL
-                const replacement = `<img src="${mediaUrl}" alt="${imageName}" />`;
-                processedContent = processedContent.replace(match[0], replacement);
+                let mediaUrl = urlCache.get(imageFile.path);
+
+                if (!mediaUrl) {
+                    const arrayBuffer = await this.app.vault.readBinary(imageFile);
+                    const obsidianFolderId = await this.mediaService.getOrCreateObsidianFolder();
+                    const mediaId = await this.mediaService.uploadImage(arrayBuffer, imageFile.name, obsidianFolderId);
+
+                    mediaUrl = await this.mediaService.getMediaUrl(mediaId);
+                    urlCache.set(imageFile.path, mediaUrl);
+                    uploadedImages.push(mediaId);
+                }
+
+                const alt = embed.alt || imageFile.basename;
+                replacements.set(embed.raw, `<img src="${mediaUrl}" alt="${this.escapeHtmlAttribute(alt)}" />`);
 
             } catch (error) {
+                const reason = error instanceof Error ? error.message : String(error);
+                failedImages.push(`${embed.target} (${reason})`);
             }
         }
 
-        return { content: processedContent, uploadedImages };
+        let processedContent = content;
+        for (const [raw, replacement] of replacements) {
+            processedContent = processedContent.split(raw).join(replacement);
+        }
+
+        if (failedImages.length > 0) {
+            console.error('umbPublisher: some images could not be uploaded', failedImages);
+            new Notice(`Could not upload ${failedImages.length} image${failedImages.length === 1 ? '' : 's'}:\n${failedImages.join('\n')}`);
+        }
+
+        return { content: processedContent, uploadedImages, failedImages };
+    }
+
+    /**
+     * Collects the unique local image embeds in the content, keyed on the raw
+     * embed text so the same image referenced twice is only uploaded once.
+     */
+    private extractImageEmbeds(content: string): ImageEmbed[] {
+        const embeds = new Map<string, ImageEmbed>();
+
+        for (const match of content.matchAll(DocumentService.WIKI_EMBED_REGEX)) {
+            const embed = this.parseWikiEmbed(match[0], match[1]);
+            if (embed && !embeds.has(embed.raw)) {
+                embeds.set(embed.raw, embed);
+            }
+        }
+
+        for (const match of content.matchAll(DocumentService.MARKDOWN_IMAGE_REGEX)) {
+            const embed = this.parseMarkdownEmbed(match[0], match[1], match[2]);
+            if (embed && !embeds.has(embed.raw)) {
+                embeds.set(embed.raw, embed);
+            }
+        }
+
+        return Array.from(embeds.values());
+    }
+
+    private parseWikiEmbed(raw: string, inner: string): ImageEmbed | null {
+        const parts = inner.split('|');
+        const target = this.normaliseTarget(parts[0].split('#')[0]);
+
+        if (!this.isLocalImage(target)) {
+            return null;
+        }
+
+        // Obsidian uses the pipe for either a display size (`|400`, `|400x300`)
+        // or alt text - only the latter is worth keeping.
+        const alias = parts.slice(1).join('|').trim();
+        const alt = alias && !/^\d+(?:x\d+)?$/.test(alias) ? alias : '';
+
+        return { raw, target, alt };
+    }
+
+    private parseMarkdownEmbed(raw: string, alt: string, destination: string): ImageEmbed | null {
+        const target = this.normaliseTarget(this.stripLinkTitle(destination));
+
+        if (!this.isLocalImage(target)) {
+            return null;
+        }
+
+        return { raw, target, alt: alt.trim() };
+    }
+
+    private stripLinkTitle(destination: string): string {
+        const trimmed = destination.trim();
+
+        if (trimmed.startsWith('<')) {
+            const end = trimmed.indexOf('>');
+            if (end !== -1) {
+                return trimmed.substring(1, end);
+            }
+        }
+
+        const withTitle = trimmed.match(/^(.*?)\s+(?:"[^"]*"|'[^']*'|\([^)]*\))$/);
+        return withTitle ? withTitle[1] : trimmed;
+    }
+
+    private normaliseTarget(target: string): string {
+        const trimmed = target.trim().replace(/^\.\//, '');
+
+        try {
+            return decodeURIComponent(trimmed);
+        } catch {
+            // Leave paths containing a stray '%' untouched rather than failing.
+            return trimmed;
+        }
+    }
+
+    private isLocalImage(target: string): boolean {
+        if (!target || !target.includes('.')) {
+            return false;
+        }
+
+        // Skip anything already hosted elsewhere (http:, https:, data:, //cdn...).
+        if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('//')) {
+            return false;
+        }
+
+        const extension = target.substring(target.lastIndexOf('.') + 1).toLowerCase();
+        return DocumentService.IMAGE_EXTENSIONS.includes(extension);
+    }
+
+    private resolveImageFile(target: string, sourcePath: string): TFile | null {
+        // Obsidian's own resolver handles shortest-path, relative and absolute links.
+        const linked = this.app.metadataCache.getFirstLinkpathDest(target, sourcePath);
+        if (linked) {
+            return linked;
+        }
+
+        const files = this.app.vault.getFiles();
+        return files.find((f: TFile) =>
+            f.path === target ||
+            f.name === target ||
+            f.path.endsWith('/' + target)
+        ) || null;
+    }
+
+    private escapeHtmlAttribute(value: string): string {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     }
 
     async createDocument(
@@ -94,8 +242,8 @@ export class DocumentService {
     ): Promise<unknown> {
         let processedContent = content;
         if (sourceFile) {
-            // Pass the app.vault instead of sourceFile
-            const { content: processed } = await this.processImagesInContent(content, this.app.vault);
+            // The note path lets Obsidian resolve relative and shortest-path links.
+            const { content: processed } = await this.processImagesInContent(content, sourceFile.path);
             processedContent = processed;
         }
 
