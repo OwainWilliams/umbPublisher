@@ -70,6 +70,7 @@ export interface umbpublisherSettings {
 	clientSecret: string;
 	titleAlias: string;
 	blogContentAlias: string;
+	tagsAlias: string;
 	contentMode: ContentMode;
 	blockPropertyAlias: string;
 	blockElementTypeId: string;
@@ -87,6 +88,7 @@ export const DEFAULT_SETTINGS: umbpublisherSettings = {
 	clientSecret: 'your-client-secret',
 	titleAlias: 'title',
 	blogContentAlias: 'blogContent',
+	tagsAlias: '',
 	contentMode: 'propertyEditor',
 	blockPropertyAlias: '',
 	blockElementTypeId: '',

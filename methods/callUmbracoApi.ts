@@ -40,8 +40,8 @@ export async function CallUmbracoApi(endpoint: string, bearerToken: string,  met
 			} else if (err.response && typeof err.response === 'object') {
 				umbracoError = err.response as unknown as UmbracoErrorResponse;
 			}
-		} catch (parseError) {
-			// If parsing fails, we can ignore it and show the generic error
+		} catch {
+			// If parsing fails, show the generic error below
 		}
 		
 		if (umbracoError) {

@@ -4,11 +4,10 @@ import { UmbracoDocType, UmbracoAllowedChildDocType } from '../types/index';
 
 export async function GetUmbracoDocTypeById(docTypeId: string, websiteUrl: string, token: string): Promise<UmbracoDocType | null> {
         const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${docTypeId}`;
-        if (token === null) {
+        if (!token) {
             new Notice('Bearer token is null. Please check your settings.');
             return null;
         }
-;
         const docTypeRaw = await CallUmbracoApi(endpoint, token, 'GET');
         if (!docTypeRaw) {
             new Notice('Failed to fetch document type by ID.');
@@ -21,7 +20,7 @@ export async function GetAllowedChildDocTypes(docTypeId: string, websiteUrl: str
     const endpoint = `${websiteUrl}/umbraco/management/api/v1/document-type/${docTypeId}/allowed-children`;
     
     
-    if (token === null) {
+    if (!token) {
         new Notice('Bearer token is null. Please check your settings.');
         return [];
     }

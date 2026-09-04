@@ -19,7 +19,7 @@ async function getBearerToken(websiteUrl: string, clientId: string, clientSecret
             body: body.toString(),
         });
         return (response.json as TokenResponse).access_token;
-    } catch (e) {
+    } catch {
         new Notice('Failed to fetch bearer token');
         return null;
     }
@@ -100,7 +100,6 @@ export class SettingTab extends PluginSettingTab {
 
     display(): void {
         let parentNodeDropdown: HTMLSelectElement | null = null;
-        let fetchButton: HTMLButtonElement | null = null;
         const { containerEl } = this;
         containerEl.empty();
 
@@ -112,7 +111,7 @@ export class SettingTab extends PluginSettingTab {
                 .setPlaceholder('Enter the website URL')
                 .setValue(this.plugin.settings.websiteUrl)
                 .onChange(async (value) => {
-                    const match = value.match(/^(https?:\/\/[^\/]+)/i);
+                    const match = value.match(/^(https?:\/\/[^/]+)/i);
         			const sanitized = match ? match[1] : value.replace(/\/.*$/, '');
         			this.plugin.settings.websiteUrl = sanitized;
 					await this.plugin.saveSettings();
@@ -141,7 +140,6 @@ export class SettingTab extends PluginSettingTab {
             .setName('Pick content parent node')
             .setDesc('Fetch and select a parent node from Umbraco where content will be saved under')
             .addButton(button => {
-                fetchButton = button.buttonEl;
                 button.setButtonText('Fetch nodes').onClick(async () => {
                     const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
                     if (!websiteUrl || !clientId || !clientSecret) {
@@ -199,13 +197,11 @@ export class SettingTab extends PluginSettingTab {
         // Only show the allowed child document types dropdown if a parent node is selected
         if (this.plugin.settings.blogParentNodeId) {
             let childDocTypeDropdown: HTMLSelectElement | null = null;
-            let fetchChildDocTypesButton: HTMLButtonElement | null = null;
 
             new Setting(containerEl)
                 .setName('Allowed child document types')
                 .setDesc('Select the document type for new content items')
                 .addButton(button => {
-                    fetchChildDocTypesButton = button.buttonEl;
                     button.setButtonText('Fetch child doc types').onClick(async () => {
                         const { websiteUrl, clientId, clientSecret, blogParentNodeId } = this.plugin.settings;
                         if (!websiteUrl || !clientId || !clientSecret || !blogParentNodeId) {
@@ -330,6 +326,7 @@ export class SettingTab extends PluginSettingTab {
 		if (this.plugin.settings.contentMode === 'propertyEditor' && this.plugin.settings.blogDocTypeId) {
 			let titleDropdown: HTMLSelectElement | null = null;
 			let contentDropdown: HTMLSelectElement | null = null;
+			let tagsDropdownEl: HTMLSelectElement | null = null;
 
 			new Setting(containerEl)
 				.setName('Fetch document type properties')
@@ -354,7 +351,7 @@ export class SettingTab extends PluginSettingTab {
 
 						this.cachedDocTypeProperties = allProps;
 
-						// Populate both dropdowns
+						// Populate title and content dropdowns
 						for (const dd of [titleDropdown, contentDropdown]) {
 							if (!dd) continue;
 							const currentVal = dd.value;
@@ -364,7 +361,7 @@ export class SettingTab extends PluginSettingTab {
 							defaultOption.text = '[Select Property]';
 							dd.appendChild(defaultOption);
 
-							this.cachedDocTypeProperties.forEach((prop: any) => {
+							this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
 								const option = createEl('option');
 								option.value = prop.alias;
 								option.text = prop.name || prop.alias;
@@ -372,6 +369,24 @@ export class SettingTab extends PluginSettingTab {
 							});
 
 							dd.value = currentVal;
+						}
+
+						// Populate tags dropdown (has a [None] option instead of [Select Property])
+						if (tagsDropdownEl) {
+							tagsDropdownEl.innerHTML = '';
+							const noneOption = activeDocument.createElement('option');
+							noneOption.value = '';
+							noneOption.text = '[None]';
+							tagsDropdownEl.appendChild(noneOption);
+
+							this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
+								const option = activeDocument.createElement('option');
+								option.value = prop.alias;
+								option.text = prop.name || prop.alias;
+								tagsDropdownEl?.appendChild(option);
+							});
+
+							tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
 						}
 
 						// Restore saved values
@@ -393,7 +408,7 @@ export class SettingTab extends PluginSettingTab {
 					titleDropdown.appendChild(defaultOption);
 
 					if (this.cachedDocTypeProperties.length > 0) {
-						this.cachedDocTypeProperties.forEach((prop: any) => {
+						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
 							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
@@ -422,7 +437,7 @@ export class SettingTab extends PluginSettingTab {
 					contentDropdown.appendChild(defaultOption);
 
 					if (this.cachedDocTypeProperties.length > 0) {
-						this.cachedDocTypeProperties.forEach((prop: any) => {
+						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
 							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
@@ -437,6 +452,35 @@ export class SettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					});
 				});
+
+			new Setting(containerEl)
+				.setName('Tags property')
+				.setDesc('Select the tags property on your document type (optional)')
+				.addDropdown(dropdown => {
+					tagsDropdownEl = dropdown.selectEl;
+
+					tagsDropdownEl.innerHTML = '';
+					const noneOption = activeDocument.createElement('option');
+					noneOption.value = '';
+					noneOption.text = '[None]';
+					tagsDropdownEl.appendChild(noneOption);
+
+					if (this.cachedDocTypeProperties.length > 0) {
+						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
+							const option = activeDocument.createElement('option');
+							option.value = prop.alias;
+							option.text = prop.name || prop.alias;
+							tagsDropdownEl?.appendChild(option);
+						});
+					}
+
+					tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
+
+					dropdown.onChange(async (value) => {
+						this.plugin.settings.tagsAlias = value;
+						await this.plugin.saveSettings();
+					});
+				});
 		}
 	}
 
@@ -446,6 +490,7 @@ export class SettingTab extends PluginSettingTab {
 	 */
 	private renderBlockSettings(containerEl: HTMLElement, modeLabel: string): void {
 		let blockPropDropdown: HTMLSelectElement | null = null;
+		let tagsDropdownEl: HTMLSelectElement | null = null;
 
 		new Setting(containerEl)
 			.setName(`${modeLabel} property`)
@@ -477,7 +522,7 @@ export class SettingTab extends PluginSettingTab {
 						defaultOption.text = '[Select Property]';
 						blockPropDropdown.appendChild(defaultOption);
 
-						this.cachedDocTypeProperties.forEach((prop: any) => {
+						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
 							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
@@ -485,6 +530,23 @@ export class SettingTab extends PluginSettingTab {
 						});
 
 						blockPropDropdown.value = this.plugin.settings.blockPropertyAlias || '';
+					}
+
+					if (tagsDropdownEl) {
+						tagsDropdownEl.innerHTML = '';
+						const noneOption = activeDocument.createElement('option');
+						noneOption.value = '';
+						noneOption.text = '[None]';
+						tagsDropdownEl.appendChild(noneOption);
+
+						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
+							const option = activeDocument.createElement('option');
+							option.value = prop.alias;
+							option.text = prop.name || prop.alias;
+							tagsDropdownEl?.appendChild(option);
+						});
+
+						tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
 					}
 				});
 			})
@@ -498,7 +560,7 @@ export class SettingTab extends PluginSettingTab {
 				blockPropDropdown.appendChild(defaultOption);
 
 				if (this.cachedDocTypeProperties.length > 0) {
-					this.cachedDocTypeProperties.forEach((prop: any) => {
+					this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
 						const option = createEl('option');
 						option.value = prop.alias;
 						option.text = prop.name || prop.alias;
@@ -638,7 +700,7 @@ export class SettingTab extends PluginSettingTab {
 							defaultOption.text = '[Select Property]';
 							contentPropDropdown.appendChild(defaultOption);
 
-							this.cachedElementTypeProperties.forEach((prop: any) => {
+							this.cachedElementTypeProperties.forEach((prop: UmbracoProperty) => {
 								const option = createEl('option');
 								option.value = prop.alias;
 								option.text = prop.name || prop.alias;
@@ -659,7 +721,7 @@ export class SettingTab extends PluginSettingTab {
 					contentPropDropdown.appendChild(defaultOption);
 
 					if (this.cachedElementTypeProperties.length > 0) {
-						this.cachedElementTypeProperties.forEach((prop: any) => {
+						this.cachedElementTypeProperties.forEach((prop: UmbracoProperty) => {
 							const option = createEl('option');
 							option.value = prop.alias;
 							option.text = prop.name || prop.alias;
@@ -675,5 +737,35 @@ export class SettingTab extends PluginSettingTab {
 					});
 				});
 		}
+
+		// Tags property dropdown - maps Obsidian frontmatter tags to an Umbraco Tags property
+		new Setting(containerEl)
+			.setName('Tags property')
+			.setDesc('Select the tags property on your document type (optional)')
+			.addDropdown(dropdown => {
+				tagsDropdownEl = dropdown.selectEl;
+
+				tagsDropdownEl.innerHTML = '';
+				const noneOption = activeDocument.createElement('option');
+				noneOption.value = '';
+				noneOption.text = '[None]';
+				tagsDropdownEl.appendChild(noneOption);
+
+				if (this.cachedDocTypeProperties.length > 0) {
+					this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
+						const option = activeDocument.createElement('option');
+						option.value = prop.alias;
+						option.text = prop.name || prop.alias;
+						tagsDropdownEl?.appendChild(option);
+					});
+				}
+
+				tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
+
+				dropdown.onChange(async (value) => {
+					this.plugin.settings.tagsAlias = value;
+					await this.plugin.saveSettings();
+				});
+			});
 	}
 }

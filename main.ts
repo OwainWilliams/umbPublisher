@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
-
 import { Editor, MarkdownView, Notice, Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, umbpublisherSettings, ContentMode } from "./types/index";
 import { SettingTab } from "./settings";
@@ -59,7 +57,7 @@ export default class umbpublisher extends Plugin {
         await this.publishToUmbraco(view);
     }
 
-    private handleEditorCommand(checking: boolean | any): boolean {
+    private handleEditorCommand(checking: boolean): boolean {
         if (checking) return true;
         
         const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -133,8 +131,9 @@ export default class umbpublisher extends Plugin {
                 this.settings.blogParentNodeId,
                 this.settings.titleAlias,
                 this.settings.blogContentAlias,
-                currentFile,  // Pass the file here
-                this.settings  // Pass settings for BlockList mode
+                currentFile,
+                this.settings,
+                content.tags
             );
 
             new Notice('Document created successfully!');
@@ -152,7 +151,7 @@ export default class umbpublisher extends Plugin {
         const legacyRaw = rawData as LegacySettings | null;
         if (legacyRaw && legacyRaw.useBlockList !== undefined && legacyRaw.contentMode === undefined) {
             this.settings.contentMode = legacyRaw.useBlockList ? 'blockList' : 'propertyEditor';
-            Reflect.deleteProperty(this.settings as object, 'useBlockList');
+            Reflect.deleteProperty(this.settings, 'useBlockList');
             await this.saveData(this.settings);
         }
 

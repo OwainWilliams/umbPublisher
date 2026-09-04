@@ -1,6 +1,5 @@
 import esbuild from "esbuild";
 import process from "process";
-import builtins from "builtin-modules";
 
 const banner =
 `/*
@@ -32,8 +31,32 @@ const context = await esbuild.context({
 		"@lezer/highlight",
 		"@lezer/lr",
 		"@types/node",
-		"@types/node-fetch",
-		...builtins],
+		"assert",
+		"buffer",
+		"cluster",
+		"crypto",
+		"dgram",
+		"dns",
+		"domain",
+		"events",
+		"fs",
+		"http",
+		"https",
+		"net",
+		"os",
+		"path",
+		"process",
+		"querystring",
+		"readline",
+		"stream",
+		"string_decoder",
+		"tls",
+		"tty",
+		"url",
+		"util",
+		"vm",
+		"zlib"
+	],
 	format: "cjs",
 	target: "es2018",
 	logLevel: "info",
