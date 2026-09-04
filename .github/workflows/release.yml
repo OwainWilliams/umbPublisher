@@ -31,7 +31,16 @@ jobs:
         run: |
           tag="${GITHUB_REF#refs/tags/}"
 
-          gh release create "$tag" \
-            --title="$tag" \
-            --draft \
-            main.js manifest.json styles.css
+          # A release may already exist for this tag, e.g. one created from the GitHub
+          # UI. Attach the built assets to it rather than opening a second,
+          # competing release for the same tag.
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" \
+              main.js manifest.json styles.css \
+              --clobber
+          else
+            gh release create "$tag" \
+              --title="$tag" \
+              --generate-notes \
+              main.js manifest.json styles.css
+          fi
