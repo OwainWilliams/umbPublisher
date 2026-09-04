@@ -31,7 +31,7 @@ async function fetchAllContentNodes(
     websiteUrl: string,
     token: string,
     parentId: string | null = null,
-    depth: number = 0
+    depth = 0
 ): Promise<UmbracoContentNode[]> {
     const endpoint = parentId
         ? `${websiteUrl}/umbraco/management/api/v1/tree/document/children?parentId=${parentId}`
@@ -112,11 +112,11 @@ export class SettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.websiteUrl)
                 .onChange(async (value) => {
                     const match = value.match(/^(https?:\/\/[^/]+)/i);
-        			const sanitized = match ? match[1] : value.replace(/\/.*$/, '');
-        			this.plugin.settings.websiteUrl = sanitized;
+					const sanitized = match ? match[1] : value.replace(/\/.*$/, '');
+					this.plugin.settings.websiteUrl = sanitized;
 					await this.plugin.saveSettings();
-				})),
-			new Setting(containerEl)
+				}));
+        new Setting(containerEl)
 				.setName('Client ID')
 				.setDesc('The client ID for the Umbraco API')
 				.addText(text => text
@@ -125,8 +125,8 @@ export class SettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.clientId = value;
 						await this.plugin.saveSettings();
-					})),
-			new Setting(containerEl)
+					}));
+        new Setting(containerEl)
 				.setName('Client secret')
 				.setDesc('The client secret for the Umbraco API')
 				.addText(text => text
@@ -135,8 +135,8 @@ export class SettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.clientSecret = value;
 						await this.plugin.saveSettings();
-					}).inputEl.setAttribute('type', 'password')),
-			 new Setting(containerEl)
+					}).inputEl.setAttribute('type', 'password'));
+        new Setting(containerEl)
             .setName('Pick content parent node')
             .setDesc('Fetch and select a parent node from Umbraco where content will be saved under')
             .addButton(button => {
@@ -374,16 +374,10 @@ export class SettingTab extends PluginSettingTab {
 						// Populate tags dropdown (has a [None] option instead of [Select Property])
 						if (tagsDropdownEl) {
 							tagsDropdownEl.innerHTML = '';
-							const noneOption = activeDocument.createElement('option');
-							noneOption.value = '';
-							noneOption.text = '[None]';
-							tagsDropdownEl.appendChild(noneOption);
+							tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
 
 							this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-								const option = activeDocument.createElement('option');
-								option.value = prop.alias;
-								option.text = prop.name || prop.alias;
-								tagsDropdownEl?.appendChild(option);
+								tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
 							});
 
 							tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
@@ -460,17 +454,11 @@ export class SettingTab extends PluginSettingTab {
 					tagsDropdownEl = dropdown.selectEl;
 
 					tagsDropdownEl.innerHTML = '';
-					const noneOption = activeDocument.createElement('option');
-					noneOption.value = '';
-					noneOption.text = '[None]';
-					tagsDropdownEl.appendChild(noneOption);
+					tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
 
 					if (this.cachedDocTypeProperties.length > 0) {
 						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-							const option = activeDocument.createElement('option');
-							option.value = prop.alias;
-							option.text = prop.name || prop.alias;
-							tagsDropdownEl?.appendChild(option);
+							tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
 						});
 					}
 
@@ -534,16 +522,10 @@ export class SettingTab extends PluginSettingTab {
 
 					if (tagsDropdownEl) {
 						tagsDropdownEl.innerHTML = '';
-						const noneOption = activeDocument.createElement('option');
-						noneOption.value = '';
-						noneOption.text = '[None]';
-						tagsDropdownEl.appendChild(noneOption);
+						tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
 
 						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-							const option = activeDocument.createElement('option');
-							option.value = prop.alias;
-							option.text = prop.name || prop.alias;
-							tagsDropdownEl?.appendChild(option);
+							tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
 						});
 
 						tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
@@ -746,17 +728,11 @@ export class SettingTab extends PluginSettingTab {
 				tagsDropdownEl = dropdown.selectEl;
 
 				tagsDropdownEl.innerHTML = '';
-				const noneOption = activeDocument.createElement('option');
-				noneOption.value = '';
-				noneOption.text = '[None]';
-				tagsDropdownEl.appendChild(noneOption);
+				tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
 
 				if (this.cachedDocTypeProperties.length > 0) {
 					this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-						const option = activeDocument.createElement('option');
-						option.value = prop.alias;
-						option.text = prop.name || prop.alias;
-						tagsDropdownEl?.appendChild(option);
+						tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
 					});
 				}
 

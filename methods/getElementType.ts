@@ -1,6 +1,6 @@
 import { Notice } from 'obsidian';
 import { CallUmbracoApi } from './callUmbracoApi';
-import { UmbracoProperty, UmbracoComposition, UmbracoDocType, UmbracoDataType, UmbracoDataTypeValue, UmbracoBlock, UmbracoElementTypeSummary } from '../types/index';
+import { UmbracoProperty, UmbracoDocType, UmbracoDataType, UmbracoDataTypeValue, UmbracoBlock, UmbracoElementTypeSummary } from '../types/index';
 
 /**
  * Get BlockList element types allowed for a specific BlockList property
@@ -25,7 +25,7 @@ export async function GetBlockListElementTypes(
     // Collect all properties: direct + from compositions
     let properties: UmbracoProperty[] = docType.properties || [];
     if (docType.compositions) {
-        for (const comp of docType.compositions as UmbracoComposition[]) {
+        for (const comp of docType.compositions) {
             if (comp.properties) {
                 properties = properties.concat(comp.properties);
             }
