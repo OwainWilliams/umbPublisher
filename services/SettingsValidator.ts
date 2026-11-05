@@ -49,6 +49,20 @@ export class SettingsValidator {
             }
         }
 
+        // The optional description property must not share a property with another mapping
+        if (settings.descriptionAlias) {
+            const isBlockMode = settings.contentMode === 'blockList' || settings.contentMode === 'blockGrid';
+            const otherAliases = [
+                settings.titleAlias,
+                settings.tagsAlias,
+                isBlockMode ? settings.blockPropertyAlias : settings.blogContentAlias
+            ];
+            if (otherAliases.includes(settings.descriptionAlias)) {
+                new Notice(`The description property '${settings.descriptionAlias}' is already used for the title, content or tags. Choose a different property.`);
+                return false;
+            }
+        }
+
         return true;
     }
 }

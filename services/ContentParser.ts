@@ -3,6 +3,7 @@ import { MarkdownView, Notice, App } from 'obsidian';
 export interface ParsedContent {
     title: string;
     tags: string[];
+    description?: string;
     featured: boolean;
     status: string;
     excerpt?: string;
@@ -34,12 +35,23 @@ export class ContentParser {
         return {
             title: metaMatter?.title || view.file?.basename || 'Untitled',
             tags: metaMatter?.tags || [],
+            description: this.parseDescription(metaMatter?.description),
             featured: metaMatter?.featured || false,
             status: metaMatter?.published ? "published" : "draft",
             excerpt: metaMatter?.excerpt || undefined,
             feature_image: metaMatter?.feature_image || undefined,
             content: content,
         };
+    }
+
+    /**
+     * Frontmatter values can be any YAML type. The description is always treated
+     * as plain text: non-strings are stringified and blank values are dropped.
+     */
+    private parseDescription(value: unknown): string | undefined {
+        if (value === null || value === undefined) return undefined;
+        const text = (typeof value === 'string' ? value : String(value)).trim();
+        return text.length > 0 ? text : undefined;
     }
 
     getActiveFileTitle(): string | null {

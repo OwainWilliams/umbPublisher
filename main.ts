@@ -133,7 +133,8 @@ export default class umbpublisher extends Plugin {
                 this.settings.blogContentAlias,
                 currentFile,
                 this.settings,
-                content.tags
+                content.tags,
+                content.description
             );
 
             new Notice('Document created successfully!');

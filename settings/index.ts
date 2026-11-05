@@ -327,6 +327,7 @@ export class SettingTab extends PluginSettingTab {
 			let titleDropdown: HTMLSelectElement | null = null;
 			let contentDropdown: HTMLSelectElement | null = null;
 			let tagsDropdownEl: HTMLSelectElement | null = null;
+			let descriptionDropdownEl: HTMLSelectElement | null = null;
 
 			new Setting(containerEl)
 				.setName('Fetch document type properties')
@@ -371,17 +372,9 @@ export class SettingTab extends PluginSettingTab {
 							dd.value = currentVal;
 						}
 
-						// Populate tags dropdown (has a [None] option instead of [Select Property])
-						if (tagsDropdownEl) {
-							tagsDropdownEl.innerHTML = '';
-							tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
-
-							this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-								tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
-							});
-
-							tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
-						}
+						// Populate the optional dropdowns (they have a [None] option instead of [Select Property])
+						this.populateOptionalPropertyDropdown(tagsDropdownEl, this.plugin.settings.tagsAlias);
+						this.populateOptionalPropertyDropdown(descriptionDropdownEl, this.plugin.settings.descriptionAlias);
 
 						// Restore saved values
 						if (titleDropdown) titleDropdown.value = this.plugin.settings.titleAlias || '';
@@ -447,29 +440,65 @@ export class SettingTab extends PluginSettingTab {
 					});
 				});
 
-			new Setting(containerEl)
-				.setName('Tags property')
-				.setDesc('Select the tags property on your document type (optional)')
-				.addDropdown(dropdown => {
-					tagsDropdownEl = dropdown.selectEl;
+			tagsDropdownEl = this.renderOptionalPropertySetting(
+				containerEl,
+				'Tags property',
+				'Select the tags property on your document type (optional)',
+				'tagsAlias'
+			);
 
-					tagsDropdownEl.innerHTML = '';
-					tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
-
-					if (this.cachedDocTypeProperties.length > 0) {
-						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-							tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
-						});
-					}
-
-					tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
-
-					dropdown.onChange(async (value) => {
-						this.plugin.settings.tagsAlias = value;
-						await this.plugin.saveSettings();
-					});
-				});
+			descriptionDropdownEl = this.renderOptionalPropertySetting(
+				containerEl,
+				'Description property',
+				'Select the property for the note\'s frontmatter description (optional). Sent as plain text to a text area, markdown or rich text property.',
+				'descriptionAlias'
+			);
 		}
+	}
+
+	/**
+	 * Renders an optional property picker (with a [None] option) bound to a settings key.
+	 * Returns the select element so a "Fetch properties" handler can repopulate it.
+	 */
+	private renderOptionalPropertySetting(
+		containerEl: HTMLElement,
+		name: string,
+		desc: string,
+		settingKey: 'tagsAlias' | 'descriptionAlias'
+	): HTMLSelectElement {
+		let selectEl!: HTMLSelectElement;
+
+		new Setting(containerEl)
+			.setName(name)
+			.setDesc(desc)
+			.addDropdown(dropdown => {
+				selectEl = dropdown.selectEl;
+				this.populateOptionalPropertyDropdown(selectEl, this.plugin.settings[settingKey]);
+
+				dropdown.onChange(async (value) => {
+					this.plugin.settings[settingKey] = value;
+					await this.plugin.saveSettings();
+				});
+			});
+
+		return selectEl;
+	}
+
+	/**
+	 * Fills an optional property dropdown with [None] plus the cached document type
+	 * properties, then restores the saved selection.
+	 */
+	private populateOptionalPropertyDropdown(selectEl: HTMLSelectElement | null, selectedAlias: string): void {
+		if (!selectEl) return;
+
+		selectEl.innerHTML = '';
+		selectEl.createEl('option', { value: '', text: '[None]' });
+
+		this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
+			selectEl.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
+		});
+
+		selectEl.value = selectedAlias || '';
 	}
 
 	/**
@@ -479,6 +508,7 @@ export class SettingTab extends PluginSettingTab {
 	private renderBlockSettings(containerEl: HTMLElement, modeLabel: string): void {
 		let blockPropDropdown: HTMLSelectElement | null = null;
 		let tagsDropdownEl: HTMLSelectElement | null = null;
+		let descriptionDropdownEl: HTMLSelectElement | null = null;
 
 		new Setting(containerEl)
 			.setName(`${modeLabel} property`)
@@ -520,16 +550,8 @@ export class SettingTab extends PluginSettingTab {
 						blockPropDropdown.value = this.plugin.settings.blockPropertyAlias || '';
 					}
 
-					if (tagsDropdownEl) {
-						tagsDropdownEl.innerHTML = '';
-						tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
-
-						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-							tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
-						});
-
-						tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
-					}
+					this.populateOptionalPropertyDropdown(tagsDropdownEl, this.plugin.settings.tagsAlias);
+					this.populateOptionalPropertyDropdown(descriptionDropdownEl, this.plugin.settings.descriptionAlias);
 				});
 			})
 			.addDropdown(dropdown => {
@@ -720,28 +742,19 @@ export class SettingTab extends PluginSettingTab {
 				});
 		}
 
-		// Tags property dropdown - maps Obsidian frontmatter tags to an Umbraco Tags property
-		new Setting(containerEl)
-			.setName('Tags property')
-			.setDesc('Select the tags property on your document type (optional)')
-			.addDropdown(dropdown => {
-				tagsDropdownEl = dropdown.selectEl;
+		// Optional document-level properties mapped from Obsidian frontmatter
+		tagsDropdownEl = this.renderOptionalPropertySetting(
+			containerEl,
+			'Tags property',
+			'Select the tags property on your document type (optional)',
+			'tagsAlias'
+		);
 
-				tagsDropdownEl.innerHTML = '';
-				tagsDropdownEl.createEl('option', { value: '', text: '[None]' });
-
-				if (this.cachedDocTypeProperties.length > 0) {
-					this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-						tagsDropdownEl?.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
-					});
-				}
-
-				tagsDropdownEl.value = this.plugin.settings.tagsAlias || '';
-
-				dropdown.onChange(async (value) => {
-					this.plugin.settings.tagsAlias = value;
-					await this.plugin.saveSettings();
-				});
-			});
+		descriptionDropdownEl = this.renderOptionalPropertySetting(
+			containerEl,
+			'Description property',
+			'Select the property for the note\'s frontmatter description (optional). Sent as plain text to a text area, markdown or rich text property.',
+			'descriptionAlias'
+		);
 	}
 }

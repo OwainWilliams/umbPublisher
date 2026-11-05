@@ -230,6 +230,38 @@ export class DocumentService {
             .replace(/"/g, '&quot;');
     }
 
+    /**
+     * Builds the value for the optional description property. The description is
+     * always plain text; its shape depends on the editor the user mapped it to.
+     * Rich text gets escaped HTML in a paragraph, every other editor gets the raw
+     * text. Returns null when no description property is configured or the note
+     * has no description.
+     */
+    private buildDescriptionValue(
+        properties: UmbracoProperty[],
+        descriptionAlias: string,
+        description: string | undefined
+    ): CreateDocumentRequest['values'][number] | null {
+        if (!descriptionAlias || !description) return null;
+
+        const property = properties.find((p) => p.alias === descriptionAlias);
+        const editorAlias = property?.dataType?.editorAlias || 'Umbraco.TextArea';
+
+        let value: unknown = description;
+        if (editorAlias === 'Umbraco.RichText' || editorAlias === 'Umbraco.TinyMCE') {
+            const html = this.escapeHtmlAttribute(description).replace(/\r?\n/g, '<br>');
+            value = { markup: `<p>${html}</p>`, blocks: null };
+        }
+
+        return {
+            editorAlias,
+            alias: descriptionAlias,
+            value,
+            culture: null,
+            segment: null
+        };
+    }
+
     async createDocument(
         docTypeId: string,
         title: string,
@@ -239,7 +271,8 @@ export class DocumentService {
         contentAlias: string,
         sourceFile?: TFile,
         settings?: umbpublisherSettings,
-        tags: string[] = []
+        tags: string[] = [],
+        description?: string
     ): Promise<unknown> {
         let processedContent = content;
         if (sourceFile) {
@@ -259,7 +292,8 @@ export class DocumentService {
                 processedContent,
                 parentId,
                 settings,
-                tags
+                tags,
+                description
             );
         } else {
             return this.createDocumentLegacy(
@@ -271,7 +305,9 @@ export class DocumentService {
                 titleAlias,
                 contentAlias,
                 settings?.tagsAlias || '',
-                tags
+                tags,
+                settings?.descriptionAlias || '',
+                description
             );
         }
     }
@@ -288,7 +324,9 @@ export class DocumentService {
         titleAlias: string,
         contentAlias: string,
         tagsAlias: string = '',
-        tags: string[] = []
+        tags: string[] = [],
+        descriptionAlias = '',
+        description?: string
     ): Promise<unknown> {
         // First, get the document type details to understand the property structure
         const docTypeDetails = await this.apiService.callApi<UmbracoDocType>(`/umbraco/management/api/v1/document-type/${docTypeId}`);
@@ -407,6 +445,12 @@ export class DocumentService {
             });
         }
 
+        // Add description property if configured and the note has a description
+        const descriptionValue = this.buildDescriptionValue(properties, descriptionAlias, description);
+        if (descriptionValue) {
+            values.push(descriptionValue);
+        }
+
         const documentRequest: CreateDocumentRequest = {
             id: documentId,
             parent: parentId && parentId.trim() !== '' && parentId !== 'null' 
@@ -464,7 +508,8 @@ export class DocumentService {
         content: string,
         parentId: string | null,
         settings: umbpublisherSettings,
-        tags: string[] = []
+        tags: string[] = [],
+        description?: string
     ): Promise<unknown> {
         const isBlockGrid = settings.contentMode === 'blockGrid';
         const modeLabel = isBlockGrid ? 'Block Grid' : 'Block List';
@@ -599,6 +644,12 @@ export class DocumentService {
                 culture: null,
                 segment: null
             });
+        }
+
+        // Add description property if configured and the note has a description
+        const descriptionValue = this.buildDescriptionValue(properties, settings.descriptionAlias, description);
+        if (descriptionValue) {
+            values.push(descriptionValue);
         }
 
         const documentRequest: CreateDocumentRequest = {
