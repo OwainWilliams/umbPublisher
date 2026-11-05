@@ -74,7 +74,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 #### 4. **Settings UI Layer** (settings/index.ts)
 
-Complex SettingTab that:
+Complex SettingTab built with Obsidian's declarative settings API (1.13+), so every setting appears in Obsidian's settings search:
+- `getSettingDefinitions()` returns groups of setting definitions. There is no `display()`; on 1.13+ Obsidian never calls it when definitions are returned
+  - Simple values (website URL, client ID, content mode) use built-in `control` definitions. `setControlValue()` is overridden to sanitize the URL and save through `plugin.saveSettings()` (which re-initialises services)
+  - Rows that depend on fetched Umbraco data use `render(setting)` callbacks. Their dropdowns are stored on the instance (`parentNodeSelect`, `propertySelects`, …) so a "Fetch" button in one row can refill dropdowns in another
+  - Conditional rows/groups use `visible: () => boolean`. Call `this.update()` (not `display()`) to rebuild and re-render after a change that affects headings, names or visibility
 - Fetches and displays Umbraco content tree (recursive with depth indentation)
 - Cascading dropdowns: parent node → allowed child doc types → document type properties
 - Content mode selector with conditional UI:
@@ -282,7 +286,7 @@ Configuration:
 1. Add value to `ContentMode` union in `types/index.ts`
 2. Add mode-specific properties to `umbpublisherSettings` and `DEFAULT_SETTINGS`
 3. Add validation in `SettingsValidator.validatePublishSettings()`
-4. Add conditional UI controls in `settings/index.ts` (`SettingTab.display()`)
+4. Add conditional UI controls in `settings/index.ts` (`SettingTab.getSettingDefinitions()`, gated with `visible`)
 5. Add branching in `DocumentService.createDocument()` to call a new creation method
 
 `DocumentService.createDocument()` receives `settings: umbpublisherSettings` as a method parameter (not via constructor) — the content mode dispatch happens there.
