@@ -71,6 +71,7 @@ export interface umbpublisherSettings {
 	titleAlias: string;
 	blogContentAlias: string;
 	tagsAlias: string;
+	descriptionAlias: string;
 	contentMode: ContentMode;
 	blockPropertyAlias: string;
 	blockElementTypeId: string;
@@ -89,6 +90,7 @@ export const DEFAULT_SETTINGS: umbpublisherSettings = {
 	titleAlias: 'title',
 	blogContentAlias: 'blogContent',
 	tagsAlias: '',
+	descriptionAlias: '',
 	contentMode: 'propertyEditor',
 	blockPropertyAlias: '',
 	blockElementTypeId: '',

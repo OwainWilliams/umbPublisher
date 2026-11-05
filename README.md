@@ -61,6 +61,27 @@ Content is wrapped in an Umbraco Block Grid structure. Use this when your docume
 
 Configuration works the same as Block List mode. Column span and row span are determined by your Block Grid configuration in Umbraco.
 
+### Optional Properties
+
+These are available in every content mode and are set on the document itself (not inside a block). Leave them as `[None]` to skip them.
+
+- **Tags property** - An Umbraco Tags property that receives the note's frontmatter `tags`
+- **Description property** - A property that receives the note's frontmatter `description`. Pick whichever editor suits your site:
+  - **Text area / text box** - the description is sent as-is
+  - **Markdown editor** - the description is sent as-is
+  - **Rich text editor** - the description is HTML-escaped and wrapped in a paragraph
+
+  The description is always treated as plain text. Markdown in it is not converted. Notes without a description leave the property empty.
+
+```yaml
+---
+title: My post
+description: A short summary of the post.
+tags:
+  - Umbraco
+---
+```
+
 ## Publishing
 
 Once configured, you can publish the currently active markdown note to Umbraco in two ways:
@@ -74,6 +95,7 @@ The plugin will:
   - Both Obsidian embeds (`![[image.png]]`, including `|400` sizing and `#subpath` suffixes) and standard markdown images (`![alt](images/image.png)`) are supported
   - Each embed is replaced with an `<img>` tag pointing at the uploaded media, and images already in the media library are reused rather than re-uploaded
   - Images already hosted elsewhere (`http(s)://`, `data:`) are left untouched, and anything that fails to upload is reported in a notice
+- Send the note's frontmatter tags and description to their mapped properties, if configured
 - Create a new document in Umbraco under your configured parent node
 
 ## Upgrading from v1.3.x
