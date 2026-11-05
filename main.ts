@@ -1,4 +1,4 @@
-import { Editor, MarkdownView, Notice, Plugin } from 'obsidian';
+import { MarkdownView, Notice, Plugin } from 'obsidian';
 import { DEFAULT_SETTINGS, umbpublisherSettings, ContentMode } from "./types/index";
 import { SettingTab } from "./settings";
 import { umbpublisherIcons } from "./icons/icons";

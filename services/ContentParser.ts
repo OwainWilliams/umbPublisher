@@ -27,7 +27,7 @@ export class ContentParser {
 
         let content = fileContent;
         if (fileCache?.frontmatterPosition) {
-            const { start, end } = fileCache.frontmatterPosition;
+            const { end } = fileCache.frontmatterPosition;
             const lines = fileContent.split('\n');
             content = lines.slice(end.line + 1).join('\n');
         }
@@ -55,10 +55,7 @@ export class ContentParser {
     }
 
     getActiveFileTitle(): string | null {
-        const activeLeaf = this.app.workspace.activeLeaf;
-        if (activeLeaf && activeLeaf.getDisplayText) {
-            return activeLeaf.getDisplayText();
-        }
-        return null;
+        const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+        return view ? view.getDisplayText() : null;
     }
 }
