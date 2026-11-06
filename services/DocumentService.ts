@@ -207,19 +207,14 @@ export class DocumentService {
         return DocumentService.IMAGE_EXTENSIONS.includes(extension);
     }
 
+    /**
+     * Resolves an embed to a vault file without enumerating the vault: Obsidian's
+     * link resolver handles shortest-path, relative and partial-path links, and a
+     * direct lookup covers a full vault path.
+     */
     private resolveImageFile(target: string, sourcePath: string): TFile | null {
-        // Obsidian's own resolver handles shortest-path, relative and absolute links.
-        const linked = this.app.metadataCache.getFirstLinkpathDest(target, sourcePath);
-        if (linked) {
-            return linked;
-        }
-
-        const files = this.app.vault.getFiles();
-        return files.find((f: TFile) =>
-            f.path === target ||
-            f.name === target ||
-            f.path.endsWith('/' + target)
-        ) || null;
+        return this.app.metadataCache.getFirstLinkpathDest(target, sourcePath)
+            ?? this.app.vault.getFileByPath(target);
     }
 
     private escapeHtmlAttribute(value: string): string {
@@ -323,7 +318,7 @@ export class DocumentService {
         parentId: string | null,
         titleAlias: string,
         contentAlias: string,
-        tagsAlias: string = '',
+        tagsAlias = '',
         tags: string[] = [],
         descriptionAlias = '',
         description?: string

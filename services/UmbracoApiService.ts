@@ -48,7 +48,7 @@ export class UmbracoApiService {
         }
     }
 
-    async callApi<T>(endpoint: string, method: string = 'GET', body?: unknown): Promise<T | null> {
+    async callApi<T>(endpoint: string, method = 'GET', body?: unknown): Promise<T | null> {
         const token = await this.getBearerToken();
         if (!token) return null;
 

@@ -1,8 +1,8 @@
 import umbpublisher from "main";
-import { App, PluginSettingTab, Setting, requestUrl, Notice } from "obsidian";
+import { App, PluginSettingTab, Setting, SettingDefinitionItem, requestUrl, Notice } from "obsidian";
 import { GetAllowedChildDocTypes, GetUmbracoDocTypeById } from "methods/getUmbracoDocType";
 import { GetBlockListElementTypes, GetElementTypeById } from "methods/getElementType";
-import { ContentMode, TokenResponse, UmbracoContentNode, UmbracoAllowedChildDocType, UmbracoElementTypeSummary, UmbracoProperty } from "../types/index";
+import { TokenResponse, UmbracoContentNode, UmbracoAllowedChildDocType, UmbracoElementTypeSummary, UmbracoProperty, umbpublisherSettings } from "../types/index";
 
 async function getBearerToken(websiteUrl: string, clientId: string, clientSecret: string): Promise<string | null> {
     const tokenEndpoint = `${websiteUrl}/umbraco/management/api/v1/security/back-office/token`;
@@ -57,6 +57,28 @@ async function fetchAllContentNodes(
     return allNodes;
 }
 
+/** Keeps only the scheme and host, e.g. "https://example.com/umbraco" -> "https://example.com". */
+function sanitizeWebsiteUrl(value: string): string {
+    const match = value.match(/^(https?:\/\/[^/]+)/i);
+    return match ? match[1] : value.replace(/\/.*$/, '');
+}
+
+interface SelectOption {
+    value: string;
+    text: string;
+}
+
+/** Settings that hold a document type property alias picked from a dropdown. */
+type PropertyAliasKey = 'titleAlias' | 'blogContentAlias' | 'blockPropertyAlias' | 'tagsAlias' | 'descriptionAlias';
+
+/**
+ * Settings tab built with Obsidian's declarative settings API (1.13+), so every
+ * setting is indexed by Obsidian's settings search.
+ *
+ * Simple values use built-in controls. Rows that depend on data fetched from
+ * Umbraco use `render` callbacks; their dropdowns are kept on the instance so
+ * a "Fetch" button in one row can refill dropdowns in another.
+ */
 export class SettingTab extends PluginSettingTab {
     plugin: umbpublisher;
     private cachedNodes: UmbracoContentNode[] = [];
@@ -65,9 +87,427 @@ export class SettingTab extends PluginSettingTab {
     private cachedElementTypeProperties: UmbracoProperty[] = [];
     private cachedDocTypeProperties: UmbracoProperty[] = [];
 
+    // Dropdowns from the current render, refilled in place by the "Fetch" buttons
+    private parentNodeSelect: HTMLSelectElement | null = null;
+    private childDocTypeSelect: HTMLSelectElement | null = null;
+    private elementTypeSelect: HTMLSelectElement | null = null;
+    private blockContentPropertySelect: HTMLSelectElement | null = null;
+    private propertySelects: Partial<Record<PropertyAliasKey, HTMLSelectElement>> = {};
+
     constructor(app: App, plugin: umbpublisher) {
         super(app, plugin);
         this.plugin = plugin;
+    }
+
+    getSettingDefinitions(): SettingDefinitionItem[] {
+        const settings = (): umbpublisherSettings => this.plugin.settings;
+        const isBlockMode = () => settings().contentMode === 'blockList' || settings().contentMode === 'blockGrid';
+        const modeLabel = settings().contentMode === 'blockGrid' ? 'Block Grid' : 'Block List';
+
+        return [
+            {
+                type: 'group',
+                heading: 'Umbraco connection',
+                items: [
+                    {
+                        name: 'Website URL',
+                        desc: 'The URL of the Umbraco website e.g. https://example.com',
+                        aliases: ['url', 'site', 'domain', 'umbraco'],
+                        control: { type: 'text', key: 'websiteUrl', placeholder: 'Enter the website URL' },
+                    },
+                    {
+                        name: 'Client ID',
+                        desc: 'The client ID for the Umbraco API',
+                        aliases: ['api', 'credentials', 'api user'],
+                        control: { type: 'text', key: 'clientId', placeholder: 'Client ID from Umbraco' },
+                    },
+                    {
+                        name: 'Client secret',
+                        desc: 'The client secret for the Umbraco API',
+                        aliases: ['api', 'credentials', 'password'],
+                        render: (setting) => this.renderClientSecret(setting),
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Content location',
+                items: [
+                    {
+                        name: 'Pick content parent node',
+                        desc: 'Fetch and select a parent node from Umbraco where content will be saved under',
+                        aliases: ['parent', 'node', 'content tree', 'location'],
+                        render: (setting) => this.renderParentNode(setting),
+                    },
+                    {
+                        name: 'Allowed child document types',
+                        desc: 'Select the document type for new content items',
+                        aliases: ['document type', 'doc type'],
+                        visible: () => !!settings().blogParentNodeId,
+                        render: (setting) => this.renderChildDocType(setting),
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Content mode',
+                items: [
+                    {
+                        name: 'Content mode',
+                        desc: 'How content is stored on the document type in Umbraco',
+                        aliases: ['property editor', 'block list', 'block grid'],
+                        control: {
+                            type: 'dropdown',
+                            key: 'contentMode',
+                            options: {
+                                propertyEditor: 'Property Editor',
+                                blockList: 'Block List',
+                                blockGrid: 'Block Grid',
+                            },
+                        },
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Property Editor',
+                visible: () => settings().contentMode === 'propertyEditor' && !!settings().blogDocTypeId,
+                items: [
+                    {
+                        name: 'Fetch document type properties',
+                        desc: 'Load properties from your document type to select title and content aliases',
+                        aliases: ['properties'],
+                        render: (setting) => {
+                            setting.addButton(button => button
+                                .setButtonText('Fetch properties')
+                                .onClick(() => this.fetchDocTypeProperties()));
+                        },
+                    },
+                    {
+                        name: 'Title property',
+                        desc: 'Select the title property on your document type',
+                        aliases: ['title'],
+                        render: (setting) => this.addPropertyDropdown(setting, 'titleAlias', '[Select Property]'),
+                    },
+                    {
+                        name: 'Content property',
+                        desc: 'Select the content/markdown property on your document type',
+                        aliases: ['content', 'markdown', 'body'],
+                        render: (setting) => this.addPropertyDropdown(setting, 'blogContentAlias', '[Select Property]'),
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: modeLabel,
+                visible: () => isBlockMode() && !!settings().blogDocTypeId,
+                items: [
+                    {
+                        name: `${modeLabel} property`,
+                        desc: `Select the ${modeLabel} property on your document type`,
+                        aliases: ['block', 'block list', 'block grid'],
+                        render: (setting) => {
+                            setting.addButton(button => button
+                                .setButtonText('Fetch properties')
+                                .onClick(() => this.fetchDocTypeProperties()));
+                            this.addPropertyDropdown(setting, 'blockPropertyAlias', '[Select Property]');
+                        },
+                    },
+                    {
+                        name: `${modeLabel} element type`,
+                        desc: 'Select the element type to use for content blocks',
+                        aliases: ['element type', 'block'],
+                        render: (setting) => this.renderElementType(setting),
+                    },
+                    {
+                        name: 'Content property',
+                        desc: 'Select the property on the element type where content will be stored',
+                        aliases: ['content', 'markdown', 'body', 'element'],
+                        visible: () => !!settings().blockElementTypeId,
+                        render: (setting) => this.renderBlockContentProperty(setting),
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Optional properties',
+                visible: () => !!settings().blogDocTypeId,
+                items: [
+                    {
+                        name: 'Tags property',
+                        desc: 'Select the tags property on your document type (optional)',
+                        aliases: ['tags', 'frontmatter'],
+                        render: (setting) => this.addPropertyDropdown(setting, 'tagsAlias', '[None]'),
+                    },
+                    {
+                        name: 'Description property',
+                        desc: 'Select the property for the note\'s frontmatter description (optional). Sent as plain text to a text area, markdown or rich text property.',
+                        aliases: ['description', 'summary', 'frontmatter'],
+                        render: (setting) => this.addPropertyDropdown(setting, 'descriptionAlias', '[None]'),
+                    },
+                ],
+            },
+        ];
+    }
+
+    /**
+     * Persists built-in control values through the plugin so its services are
+     * re-initialised with the new settings.
+     */
+    async setControlValue(key: string, value: unknown): Promise<void> {
+        const settings = this.plugin.settings as unknown as Record<string, unknown>;
+        settings[key] = key === 'websiteUrl' && typeof value === 'string' ? sanitizeWebsiteUrl(value) : value;
+        await this.plugin.saveSettings();
+
+        // Headings and row names depend on the mode, so rebuild the definitions
+        if (key === 'contentMode') {
+            this.update();
+        }
+    }
+
+    // ------------------------------------------------------------------ rows
+
+    private renderClientSecret(setting: Setting): void {
+        setting.addText(text => {
+            text
+                .setPlaceholder('Client secret from Umbraco')
+                .setValue(this.plugin.settings.clientSecret)
+                .onChange(async (value) => {
+                    this.plugin.settings.clientSecret = value;
+                    await this.plugin.saveSettings();
+                });
+            text.inputEl.setAttribute('type', 'password');
+        });
+    }
+
+    private renderParentNode(setting: Setting): void {
+        setting
+            .addButton(button => button.setButtonText('Fetch nodes').onClick(async () => {
+                const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
+                if (!websiteUrl || !clientId || !clientSecret) {
+                    new Notice('Please enter Website URL, Client Id, and Client Secret first.');
+                    return;
+                }
+                const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+                if (!token) return;
+
+                this.cachedNodes = await fetchAllContentNodes(websiteUrl, token);
+                this.fillSelect(this.parentNodeSelect, '[Select Node]', this.nodeOptions(), this.plugin.settings.blogParentNodeId);
+            }))
+            .addDropdown(dropdown => {
+                this.parentNodeSelect = dropdown.selectEl;
+                this.fillSelect(dropdown.selectEl, '[Select Node]', this.nodeOptions(), this.plugin.settings.blogParentNodeId);
+
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.blogParentNodeId = value;
+                    await this.plugin.saveSettings();
+                    // Show or hide the allowed child doc types row
+                    this.update();
+                });
+            });
+    }
+
+    private renderChildDocType(setting: Setting): void {
+        setting
+            .addButton(button => button.setButtonText('Fetch child doc types').onClick(async () => {
+                const { websiteUrl, clientId, clientSecret, blogParentNodeId } = this.plugin.settings;
+                if (!websiteUrl || !clientId || !clientSecret || !blogParentNodeId) {
+                    new Notice('Please ensure all required settings are configured.');
+                    return;
+                }
+
+                const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+                if (!token) return;
+
+                // Find the selected parent node to get its document type ID
+                const selectedNode = this.cachedNodes.find(node => node.id === blogParentNodeId);
+                if (!selectedNode) {
+                    new Notice('Selected parent node not found. Please re-fetch nodes.');
+                    return;
+                }
+
+                this.cachedAllowedChildDocTypes = await GetAllowedChildDocTypes(
+                    selectedNode.documentType.id,
+                    websiteUrl,
+                    token
+                );
+                this.fillSelect(this.childDocTypeSelect, '[Select Document Type]', this.childDocTypeOptions(), this.plugin.settings.blogDocTypeId);
+            }))
+            .addDropdown(dropdown => {
+                this.childDocTypeSelect = dropdown.selectEl;
+                this.fillSelect(dropdown.selectEl, '[Select Document Type]', this.childDocTypeOptions(), this.plugin.settings.blogDocTypeId);
+
+                dropdown.onChange(async (value) => {
+                    if (value) {
+                        const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
+                        const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+
+                        if (token) {
+                            // Fetch the full document type details to get the alias
+                            const docTypeDetails = await GetUmbracoDocTypeById(value, websiteUrl, token);
+
+                            if (docTypeDetails) {
+                                if (docTypeDetails.id && docTypeDetails.alias) {
+                                    this.plugin.settings.blogDocTypeId = docTypeDetails.id;
+                                    this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
+                                } else {
+                                    new Notice('Selected document type is missing required fields (id/alias).');
+                                    return;
+                                }
+                            }
+                        }
+                    } else {
+                        this.plugin.settings.blogDocTypeId = '';
+                        this.plugin.settings.blogDocTypeAlias = '';
+                    }
+
+                    await this.plugin.saveSettings();
+                    // Show or hide the mode-specific and optional property rows
+                    this.update();
+                });
+            });
+    }
+
+    private renderElementType(setting: Setting): void {
+        setting
+            .addButton(button => button.setButtonText('Fetch element types').onClick(async () => {
+                const { websiteUrl, clientId, clientSecret, blogDocTypeId, blockPropertyAlias } = this.plugin.settings;
+
+                if (!websiteUrl || !clientId || !clientSecret || !blogDocTypeId || !blockPropertyAlias) {
+                    new Notice('Please configure all required settings first.');
+                    return;
+                }
+
+                const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+                if (!token) return;
+
+                this.cachedBlockListElementTypes = await GetBlockListElementTypes(
+                    blogDocTypeId,
+                    blockPropertyAlias,
+                    websiteUrl,
+                    token
+                );
+                this.fillSelect(this.elementTypeSelect, '[Select Element Type]', this.elementTypeOptions(), this.plugin.settings.blockElementTypeId);
+            }))
+            .addDropdown(dropdown => {
+                this.elementTypeSelect = dropdown.selectEl;
+                this.fillSelect(dropdown.selectEl, '[Select Element Type]', this.elementTypeOptions(), this.plugin.settings.blockElementTypeId);
+
+                dropdown.onChange(async (value) => {
+                    if (value) {
+                        const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
+                        const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+
+                        if (token) {
+                            const elementTypeDetails = await GetElementTypeById(value, websiteUrl, token);
+
+                            if (elementTypeDetails) {
+                                if (elementTypeDetails.id && elementTypeDetails.alias) {
+                                    this.plugin.settings.blockElementTypeId = elementTypeDetails.id;
+                                    this.plugin.settings.blockElementTypeAlias = elementTypeDetails.alias;
+                                } else {
+                                    new Notice('Selected element type is missing required fields (id/alias).');
+                                    return;
+                                }
+                                this.cachedElementTypeProperties = elementTypeDetails.properties || [];
+                            }
+                        }
+                    } else {
+                        this.plugin.settings.blockElementTypeId = '';
+                        this.plugin.settings.blockElementTypeAlias = '';
+                        this.plugin.settings.blockContentPropertyAlias = '';
+                        this.cachedElementTypeProperties = [];
+                    }
+
+                    await this.plugin.saveSettings();
+                    // Show or hide the element content property row, with fresh options
+                    this.update();
+                });
+            });
+    }
+
+    private renderBlockContentProperty(setting: Setting): void {
+        setting
+            .addButton(button => button.setButtonText('Fetch properties').onClick(async () => {
+                const { websiteUrl, clientId, clientSecret, blockElementTypeId } = this.plugin.settings;
+
+                if (!blockElementTypeId) {
+                    new Notice('Please select an element type first.');
+                    return;
+                }
+
+                const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+                if (!token) return;
+
+                const elementTypeDetails = await GetElementTypeById(blockElementTypeId, websiteUrl, token);
+                if (elementTypeDetails) {
+                    this.cachedElementTypeProperties = elementTypeDetails.properties || [];
+                }
+                this.fillSelect(this.blockContentPropertySelect, '[Select Property]', this.propertyOptions(this.cachedElementTypeProperties), this.plugin.settings.blockContentPropertyAlias);
+            }))
+            .addDropdown(dropdown => {
+                this.blockContentPropertySelect = dropdown.selectEl;
+                this.fillSelect(dropdown.selectEl, '[Select Property]', this.propertyOptions(this.cachedElementTypeProperties), this.plugin.settings.blockContentPropertyAlias);
+
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.blockContentPropertyAlias = value;
+                    await this.plugin.saveSettings();
+                });
+            });
+    }
+
+    /**
+     * Adds a dropdown of the cached document type properties, bound to a settings key.
+     * The placeholder is "[Select Property]" for required pickers and "[None]" for optional ones.
+     */
+    private addPropertyDropdown(setting: Setting, key: PropertyAliasKey, placeholder: string): void {
+        setting.addDropdown(dropdown => {
+            this.propertySelects[key] = dropdown.selectEl;
+            this.fillSelect(dropdown.selectEl, placeholder, this.propertyOptions(this.cachedDocTypeProperties), this.plugin.settings[key]);
+
+            dropdown.onChange(async (value) => {
+                this.plugin.settings[key] = value;
+                await this.plugin.saveSettings();
+            });
+        });
+    }
+
+    // ------------------------------------------------------------------ data
+
+    /**
+     * Fetches the document type's properties (including compositions) and refills
+     * every document type property dropdown on the tab.
+     */
+    private async fetchDocTypeProperties(): Promise<void> {
+        const { websiteUrl, clientId, clientSecret, blogDocTypeId } = this.plugin.settings;
+
+        if (!blogDocTypeId) {
+            new Notice('Please select a document type first.');
+            return;
+        }
+
+        const token = await getBearerToken(websiteUrl, clientId, clientSecret);
+        if (!token) return;
+
+        const allProps = await this.fetchAllDocTypeProperties(blogDocTypeId, websiteUrl, token);
+        if (allProps.length === 0) {
+            new Notice('Failed to fetch document type.');
+            return;
+        }
+
+        this.cachedDocTypeProperties = allProps;
+
+        const options = this.propertyOptions(allProps);
+        const placeholders: Record<PropertyAliasKey, string> = {
+            titleAlias: '[Select Property]',
+            blogContentAlias: '[Select Property]',
+            blockPropertyAlias: '[Select Property]',
+            tagsAlias: '[None]',
+            descriptionAlias: '[None]',
+        };
+        for (const key of Object.keys(placeholders) as PropertyAliasKey[]) {
+            this.fillSelect(this.propertySelects[key] ?? null, placeholders[key], options, this.plugin.settings[key]);
+        }
     }
 
     /**
@@ -98,663 +538,37 @@ export class SettingTab extends PluginSettingTab {
         return allProps;
     }
 
-    display(): void {
-        let parentNodeDropdown: HTMLSelectElement | null = null;
-        const { containerEl } = this;
-        containerEl.empty();
+    private nodeOptions(): SelectOption[] {
+        return this.cachedNodes.map(node => ({
+            value: node.id,
+            text: `${'—'.repeat(node.depth)} ${node.variants[0].name}`,
+        }));
+    }
 
-        
-        new Setting(containerEl)
-            .setName('Website URL')
-            .setDesc('The URL of the Umbraco website e.g. https://example.com')
-            .addText(text => text
-                .setPlaceholder('Enter the website URL')
-                .setValue(this.plugin.settings.websiteUrl)
-                .onChange(async (value) => {
-                    const match = value.match(/^(https?:\/\/[^/]+)/i);
-					const sanitized = match ? match[1] : value.replace(/\/.*$/, '');
-					this.plugin.settings.websiteUrl = sanitized;
-					await this.plugin.saveSettings();
-				}));
-        new Setting(containerEl)
-				.setName('Client ID')
-				.setDesc('The client ID for the Umbraco API')
-				.addText(text => text
-					.setPlaceholder('Client ID from Umbraco')
-					.setValue(this.plugin.settings.clientId)
-					.onChange(async (value) => {
-						this.plugin.settings.clientId = value;
-						await this.plugin.saveSettings();
-					}));
-        new Setting(containerEl)
-				.setName('Client secret')
-				.setDesc('The client secret for the Umbraco API')
-				.addText(text => text
-					.setPlaceholder('Client secret from Umbraco')
-					.setValue(this.plugin.settings.clientSecret)
-					.onChange(async (value) => {
-						this.plugin.settings.clientSecret = value;
-						await this.plugin.saveSettings();
-					}).inputEl.setAttribute('type', 'password'));
-        new Setting(containerEl)
-            .setName('Pick content parent node')
-            .setDesc('Fetch and select a parent node from Umbraco where content will be saved under')
-            .addButton(button => {
-                button.setButtonText('Fetch nodes').onClick(async () => {
-                    const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
-                    if (!websiteUrl || !clientId || !clientSecret) {
-                        new Notice('Please enter Website URL, Client Id, and Client Secret first.');
-                        return;
-                    }
-                    const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-                    if (!token) return;
-                    // Fetch all nodes recursively and cache them
-                    this.cachedNodes = await fetchAllContentNodes(websiteUrl, token);
-                    if (parentNodeDropdown) {
-                        parentNodeDropdown.innerHTML = '';
-                        const rootOption = createEl('option');
-                        rootOption.value = '';
-                        rootOption.text = '[Select Node]';
-                        parentNodeDropdown.appendChild(rootOption);
-                        this.cachedNodes.forEach(node => {
-                            const option = createEl('option');
-                            option.value = node.id;
-                            option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
-                            parentNodeDropdown?.appendChild(option);
-                        });
-                        parentNodeDropdown.value = this.plugin.settings.blogParentNodeId || '';
-                    }
-                });
-            })
-            .addDropdown(dropdown => {
-                parentNodeDropdown = dropdown.selectEl;
-                // Populate dropdown from cache if available
-                parentNodeDropdown.innerHTML = '';
-                const rootOption = createEl('option');
-                rootOption.value = '';
-                rootOption.text = '[Select Node]';
-                parentNodeDropdown.appendChild(rootOption);
-                if (this.cachedNodes.length > 0) {
-                    this.cachedNodes.forEach(node => {
-                        const option = createEl('option');
-                        option.value = node.id;
-                        option.text = `${'—'.repeat(node.depth)} ${node.variants[0].name}`;
-                        parentNodeDropdown?.appendChild(option);
-                    });
-                }
-                parentNodeDropdown.value = this.plugin.settings.blogParentNodeId || '';
+    private childDocTypeOptions(): SelectOption[] {
+        return this.cachedAllowedChildDocTypes.map(docType => ({ value: docType.id, text: docType.name }));
+    }
 
-                dropdown.onChange(async (value) => {
-                    this.plugin.settings.blogParentNodeId = value;
-                    await this.plugin.saveSettings();
-                    
-                    // Refresh the display to show/hide the allowed child doc types dropdown
-                    this.display();
-                });
-                
-            });
+    private elementTypeOptions(): SelectOption[] {
+        return this.cachedBlockListElementTypes.map(elementType => ({
+            value: elementType.id,
+            text: elementType.name || elementType.alias,
+        }));
+    }
 
-        // Only show the allowed child document types dropdown if a parent node is selected
-        if (this.plugin.settings.blogParentNodeId) {
-            let childDocTypeDropdown: HTMLSelectElement | null = null;
+    private propertyOptions(properties: UmbracoProperty[]): SelectOption[] {
+        return properties.map(prop => ({ value: prop.alias, text: prop.name || prop.alias }));
+    }
 
-            new Setting(containerEl)
-                .setName('Allowed child document types')
-                .setDesc('Select the document type for new content items')
-                .addButton(button => {
-                    button.setButtonText('Fetch child doc types').onClick(async () => {
-                        const { websiteUrl, clientId, clientSecret, blogParentNodeId } = this.plugin.settings;
-                        if (!websiteUrl || !clientId || !clientSecret || !blogParentNodeId) {
-                            new Notice('Please ensure all required settings are configured.');
-                            return;
-                        }
+    /** Replaces a dropdown's options with a placeholder plus the given options, then restores the selection. */
+    private fillSelect(selectEl: HTMLSelectElement | null, placeholder: string, options: SelectOption[], selected: string): void {
+        if (!selectEl) return;
 
-                        const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-                        if (!token) return;
-
-                        // Find the selected parent node to get its document type ID
-                        const selectedNode = this.cachedNodes.find(node => node.id === blogParentNodeId);
-                        if (!selectedNode) {
-                            new Notice('Selected parent node not found. Please re-fetch nodes.');
-                            return;
-                        }
-
-                        // Fetch allowed child document types
-                        this.cachedAllowedChildDocTypes = await GetAllowedChildDocTypes(
-                            selectedNode.documentType.id, 
-                            websiteUrl, 
-                            token
-                        );
-
-                        if (childDocTypeDropdown) {
-                            childDocTypeDropdown.innerHTML = '';
-                            const defaultOption = createEl('option');
-                            defaultOption.value = '';
-                            defaultOption.text = '[Select Document Type]';
-                            childDocTypeDropdown.appendChild(defaultOption);
-
-                            this.cachedAllowedChildDocTypes.forEach(docType => {
-                                const option = createEl('option');
-                                option.value = docType.id;
-                                option.text = docType.name;
-                                childDocTypeDropdown?.appendChild(option);
-                            });
-
-                            childDocTypeDropdown.value = this.plugin.settings.blogDocTypeId || '';
-                        }
-                    });
-                })
-                .addDropdown(dropdown => {
-                    childDocTypeDropdown = dropdown.selectEl;
-                    
-                    // Populate dropdown from cache if available
-                    childDocTypeDropdown.innerHTML = '';
-                    const defaultOption = createEl('option');
-                    defaultOption.value = '';
-                    defaultOption.text = '[Select Document Type]';
-                    childDocTypeDropdown.appendChild(defaultOption);
-
-                    if (this.cachedAllowedChildDocTypes.length > 0) {
-                        this.cachedAllowedChildDocTypes.forEach(docType => {
-                            const option = createEl('option');
-                            option.value = docType.id;
-                            option.text = docType.name;
-                            childDocTypeDropdown?.appendChild(option);
-                        });
-                    }
-
-                    childDocTypeDropdown.value = this.plugin.settings.blogDocTypeId || '';
-
-                    dropdown.onChange(async (value) => {
-                        if (value) {
-                            // Get the bearer token
-                            const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
-                            const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-                            
-                            if (token) {
-                                // Fetch the full document type details to get the alias
-                                const docTypeDetails = await GetUmbracoDocTypeById(value, websiteUrl, token);
-                                
-                                if (docTypeDetails) {
-									if (docTypeDetails.id && docTypeDetails.alias) {
-										this.plugin.settings.blogDocTypeId = docTypeDetails.id;
-										this.plugin.settings.blogDocTypeAlias = docTypeDetails.alias;
-									} else {
-										new Notice('Selected document type is missing required fields (id/alias).');
-										return;
-									}
-                                }
-                            }
-                        } else {
-                            this.plugin.settings.blogDocTypeId = '';
-                            this.plugin.settings.blogDocTypeAlias = '';
-                        }
-                        
-                        await this.plugin.saveSettings();
-                        
-                        // Refresh the display to update the DocType alias field
-                        this.display();
-                    });
-                });
+        selectEl.empty();
+        selectEl.createEl('option', { value: '', text: placeholder });
+        for (const option of options) {
+            selectEl.createEl('option', { value: option.value, text: option.text });
         }
-
-		// Content Mode Selection
-		new Setting(containerEl)
-			.setName('Content mode')
-			.setDesc('How content is stored on the document type in Umbraco')
-			.addDropdown(dropdown => {
-				dropdown
-					.addOption('propertyEditor', 'Property Editor')
-					.addOption('blockList', 'Block List')
-					.addOption('blockGrid', 'Block Grid')
-					.setValue(this.plugin.settings.contentMode)
-					.onChange(async (value) => {
-						this.plugin.settings.contentMode = value as ContentMode;
-						await this.plugin.saveSettings();
-						this.display();
-					});
-			});
-
-		// Show block settings when Block List or Block Grid mode is selected
-		if ((this.plugin.settings.contentMode === 'blockList' || this.plugin.settings.contentMode === 'blockGrid') && this.plugin.settings.blogDocTypeId) {
-			const modeLabel = this.plugin.settings.contentMode === 'blockGrid' ? 'Block Grid' : 'Block List';
-			this.renderBlockSettings(containerEl, modeLabel);
-
-		}
-
-		// Show legacy settings only when using Property Editor mode
-		if (this.plugin.settings.contentMode === 'propertyEditor' && this.plugin.settings.blogDocTypeId) {
-			let titleDropdown: HTMLSelectElement | null = null;
-			let contentDropdown: HTMLSelectElement | null = null;
-			let tagsDropdownEl: HTMLSelectElement | null = null;
-			let descriptionDropdownEl: HTMLSelectElement | null = null;
-
-			new Setting(containerEl)
-				.setName('Fetch document type properties')
-				.setDesc('Load properties from your document type to select title and content aliases')
-				.addButton(button => {
-					button.setButtonText('Fetch properties').onClick(async () => {
-						const { websiteUrl, clientId, clientSecret, blogDocTypeId } = this.plugin.settings;
-
-						if (!blogDocTypeId) {
-							new Notice('Please select a document type first.');
-							return;
-						}
-
-						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-						if (!token) return;
-
-						const allProps = await this.fetchAllDocTypeProperties(blogDocTypeId, websiteUrl, token);
-						if (allProps.length === 0) {
-							new Notice('Failed to fetch document type.');
-							return;
-						}
-
-						this.cachedDocTypeProperties = allProps;
-
-						// Populate title and content dropdowns
-						for (const dd of [titleDropdown, contentDropdown]) {
-							if (!dd) continue;
-							const currentVal = dd.value;
-							dd.innerHTML = '';
-							const defaultOption = createEl('option');
-							defaultOption.value = '';
-							defaultOption.text = '[Select Property]';
-							dd.appendChild(defaultOption);
-
-							this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-								const option = createEl('option');
-								option.value = prop.alias;
-								option.text = prop.name || prop.alias;
-								dd.appendChild(option);
-							});
-
-							dd.value = currentVal;
-						}
-
-						// Populate the optional dropdowns (they have a [None] option instead of [Select Property])
-						this.populateOptionalPropertyDropdown(tagsDropdownEl, this.plugin.settings.tagsAlias);
-						this.populateOptionalPropertyDropdown(descriptionDropdownEl, this.plugin.settings.descriptionAlias);
-
-						// Restore saved values
-						if (titleDropdown) titleDropdown.value = this.plugin.settings.titleAlias || '';
-						if (contentDropdown) contentDropdown.value = this.plugin.settings.blogContentAlias || '';
-					});
-				});
-
-			new Setting(containerEl)
-				.setName('Title property')
-				.setDesc('Select the title property on your document type')
-				.addDropdown(dropdown => {
-					titleDropdown = dropdown.selectEl;
-
-					titleDropdown.innerHTML = '';
-					const defaultOption = createEl('option');
-					defaultOption.value = '';
-					defaultOption.text = '[Select Property]';
-					titleDropdown.appendChild(defaultOption);
-
-					if (this.cachedDocTypeProperties.length > 0) {
-						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-							const option = createEl('option');
-							option.value = prop.alias;
-							option.text = prop.name || prop.alias;
-							titleDropdown?.appendChild(option);
-						});
-					}
-
-					titleDropdown.value = this.plugin.settings.titleAlias || '';
-
-					dropdown.onChange(async (value) => {
-						this.plugin.settings.titleAlias = value;
-						await this.plugin.saveSettings();
-					});
-				});
-
-			new Setting(containerEl)
-				.setName('Content property')
-				.setDesc('Select the content/markdown property on your document type')
-				.addDropdown(dropdown => {
-					contentDropdown = dropdown.selectEl;
-
-					contentDropdown.innerHTML = '';
-					const defaultOption = createEl('option');
-					defaultOption.value = '';
-					defaultOption.text = '[Select Property]';
-					contentDropdown.appendChild(defaultOption);
-
-					if (this.cachedDocTypeProperties.length > 0) {
-						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-							const option = createEl('option');
-							option.value = prop.alias;
-							option.text = prop.name || prop.alias;
-							contentDropdown?.appendChild(option);
-						});
-					}
-
-					contentDropdown.value = this.plugin.settings.blogContentAlias || '';
-
-					dropdown.onChange(async (value) => {
-						this.plugin.settings.blogContentAlias = value;
-						await this.plugin.saveSettings();
-					});
-				});
-
-			tagsDropdownEl = this.renderOptionalPropertySetting(
-				containerEl,
-				'Tags property',
-				'Select the tags property on your document type (optional)',
-				'tagsAlias'
-			);
-
-			descriptionDropdownEl = this.renderOptionalPropertySetting(
-				containerEl,
-				'Description property',
-				'Select the property for the note\'s frontmatter description (optional). Sent as plain text to a text area, markdown or rich text property.',
-				'descriptionAlias'
-			);
-		}
-	}
-
-	/**
-	 * Renders an optional property picker (with a [None] option) bound to a settings key.
-	 * Returns the select element so a "Fetch properties" handler can repopulate it.
-	 */
-	private renderOptionalPropertySetting(
-		containerEl: HTMLElement,
-		name: string,
-		desc: string,
-		settingKey: 'tagsAlias' | 'descriptionAlias'
-	): HTMLSelectElement {
-		let selectEl!: HTMLSelectElement;
-
-		new Setting(containerEl)
-			.setName(name)
-			.setDesc(desc)
-			.addDropdown(dropdown => {
-				selectEl = dropdown.selectEl;
-				this.populateOptionalPropertyDropdown(selectEl, this.plugin.settings[settingKey]);
-
-				dropdown.onChange(async (value) => {
-					this.plugin.settings[settingKey] = value;
-					await this.plugin.saveSettings();
-				});
-			});
-
-		return selectEl;
-	}
-
-	/**
-	 * Fills an optional property dropdown with [None] plus the cached document type
-	 * properties, then restores the saved selection.
-	 */
-	private populateOptionalPropertyDropdown(selectEl: HTMLSelectElement | null, selectedAlias: string): void {
-		if (!selectEl) return;
-
-		selectEl.innerHTML = '';
-		selectEl.createEl('option', { value: '', text: '[None]' });
-
-		this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-			selectEl.createEl('option', { value: prop.alias, text: prop.name || prop.alias });
-		});
-
-		selectEl.value = selectedAlias || '';
-	}
-
-	/**
-	 * Renders the shared block settings (property picker, element type picker, content property picker)
-	 * Used by both Block List and Block Grid modes.
-	 */
-	private renderBlockSettings(containerEl: HTMLElement, modeLabel: string): void {
-		let blockPropDropdown: HTMLSelectElement | null = null;
-		let tagsDropdownEl: HTMLSelectElement | null = null;
-		let descriptionDropdownEl: HTMLSelectElement | null = null;
-
-		new Setting(containerEl)
-			.setName(`${modeLabel} property`)
-			.setDesc(`Select the ${modeLabel} property on your document type`)
-			.addButton(button => {
-				button.setButtonText('Fetch properties').onClick(async () => {
-					const { websiteUrl, clientId, clientSecret, blogDocTypeId } = this.plugin.settings;
-
-					if (!blogDocTypeId) {
-						new Notice('Please select a document type first.');
-						return;
-					}
-
-					const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-					if (!token) return;
-
-					const allProps = await this.fetchAllDocTypeProperties(blogDocTypeId, websiteUrl, token);
-					if (allProps.length === 0) {
-						new Notice('Failed to fetch document type.');
-						return;
-					}
-
-					this.cachedDocTypeProperties = allProps;
-
-					if (blockPropDropdown) {
-						blockPropDropdown.innerHTML = '';
-						const defaultOption = createEl('option');
-						defaultOption.value = '';
-						defaultOption.text = '[Select Property]';
-						blockPropDropdown.appendChild(defaultOption);
-
-						this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-							const option = createEl('option');
-							option.value = prop.alias;
-							option.text = prop.name || prop.alias;
-							blockPropDropdown?.appendChild(option);
-						});
-
-						blockPropDropdown.value = this.plugin.settings.blockPropertyAlias || '';
-					}
-
-					this.populateOptionalPropertyDropdown(tagsDropdownEl, this.plugin.settings.tagsAlias);
-					this.populateOptionalPropertyDropdown(descriptionDropdownEl, this.plugin.settings.descriptionAlias);
-				});
-			})
-			.addDropdown(dropdown => {
-				blockPropDropdown = dropdown.selectEl;
-
-				blockPropDropdown.innerHTML = '';
-				const defaultOption = createEl('option');
-				defaultOption.value = '';
-				defaultOption.text = '[Select Property]';
-				blockPropDropdown.appendChild(defaultOption);
-
-				if (this.cachedDocTypeProperties.length > 0) {
-					this.cachedDocTypeProperties.forEach((prop: UmbracoProperty) => {
-						const option = createEl('option');
-						option.value = prop.alias;
-						option.text = prop.name || prop.alias;
-						blockPropDropdown?.appendChild(option);
-					});
-				}
-
-				blockPropDropdown.value = this.plugin.settings.blockPropertyAlias || '';
-
-				dropdown.onChange(async (value) => {
-					this.plugin.settings.blockPropertyAlias = value;
-					await this.plugin.saveSettings();
-				});
-			});
-
-		let elementTypeDropdown: HTMLSelectElement | null = null;
-
-		new Setting(containerEl)
-			.setName(`${modeLabel} element type`)
-			.setDesc('Select the element type to use for content blocks')
-			.addButton(button => {
-				button.setButtonText('Fetch element types').onClick(async () => {
-					const { websiteUrl, clientId, clientSecret, blogDocTypeId, blockPropertyAlias } = this.plugin.settings;
-
-					if (!websiteUrl || !clientId || !clientSecret || !blogDocTypeId || !blockPropertyAlias) {
-						new Notice('Please configure all required settings first.');
-						return;
-					}
-
-					const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-					if (!token) return;
-
-					this.cachedBlockListElementTypes = await GetBlockListElementTypes(
-						blogDocTypeId,
-						blockPropertyAlias,
-						websiteUrl,
-						token
-					);
-
-					if (elementTypeDropdown) {
-						elementTypeDropdown.innerHTML = '';
-						const defaultOption = createEl('option');
-						defaultOption.value = '';
-						defaultOption.text = '[Select Element Type]';
-						elementTypeDropdown.appendChild(defaultOption);
-
-						this.cachedBlockListElementTypes.forEach(elementType => {
-							const option = createEl('option');
-							option.value = elementType.id;
-							option.text = elementType.name || elementType.alias;
-							elementTypeDropdown?.appendChild(option);
-						});
-
-						elementTypeDropdown.value = this.plugin.settings.blockElementTypeId || '';
-					}
-				});
-			})
-			.addDropdown(dropdown => {
-				elementTypeDropdown = dropdown.selectEl;
-
-				elementTypeDropdown.innerHTML = '';
-				const defaultOption = createEl('option');
-				defaultOption.value = '';
-				defaultOption.text = '[Select Element Type]';
-				elementTypeDropdown.appendChild(defaultOption);
-
-				if (this.cachedBlockListElementTypes.length > 0) {
-					this.cachedBlockListElementTypes.forEach(elementType => {
-						const option = createEl('option');
-						option.value = elementType.id;
-						option.text = elementType.name || elementType.alias;
-						elementTypeDropdown?.appendChild(option);
-					});
-				}
-
-				elementTypeDropdown.value = this.plugin.settings.blockElementTypeId || '';
-
-				dropdown.onChange(async (value) => {
-					if (value) {
-						const { websiteUrl, clientId, clientSecret } = this.plugin.settings;
-						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-
-						if (token) {
-							const elementTypeDetails = await GetElementTypeById(value, websiteUrl, token);
-
-							if (elementTypeDetails) {
-								if (elementTypeDetails.id && elementTypeDetails.alias) {
-									this.plugin.settings.blockElementTypeId = elementTypeDetails.id;
-									this.plugin.settings.blockElementTypeAlias = elementTypeDetails.alias;
-								} else {
-									new Notice('Selected element type is missing required fields (id/alias).');
-									return;
-								}
-								this.cachedElementTypeProperties = elementTypeDetails.properties || [];
-							}
-						}
-					} else {
-						this.plugin.settings.blockElementTypeId = '';
-						this.plugin.settings.blockElementTypeAlias = '';
-						this.plugin.settings.blockContentPropertyAlias = '';
-						this.cachedElementTypeProperties = [];
-					}
-
-					await this.plugin.saveSettings();
-					this.display();
-				});
-			});
-
-		// Content property dropdown - shown when element type is selected
-		if (this.plugin.settings.blockElementTypeId) {
-			let contentPropDropdown: HTMLSelectElement | null = null;
-
-			new Setting(containerEl)
-				.setName('Content property')
-				.setDesc('Select the property on the element type where content will be stored')
-				.addButton(button => {
-					button.setButtonText('Fetch properties').onClick(async () => {
-						const { websiteUrl, clientId, clientSecret, blockElementTypeId } = this.plugin.settings;
-
-						if (!blockElementTypeId) {
-							new Notice('Please select an element type first.');
-							return;
-						}
-
-						const token = await getBearerToken(websiteUrl, clientId, clientSecret);
-						if (!token) return;
-
-						const elementTypeDetails = await GetElementTypeById(blockElementTypeId, websiteUrl, token);
-						if (elementTypeDetails) {
-							this.cachedElementTypeProperties = elementTypeDetails.properties || [];
-						}
-
-						if (contentPropDropdown) {
-							contentPropDropdown.innerHTML = '';
-							const defaultOption = createEl('option');
-							defaultOption.value = '';
-							defaultOption.text = '[Select Property]';
-							contentPropDropdown.appendChild(defaultOption);
-
-							this.cachedElementTypeProperties.forEach((prop: UmbracoProperty) => {
-								const option = createEl('option');
-								option.value = prop.alias;
-								option.text = prop.name || prop.alias;
-								contentPropDropdown?.appendChild(option);
-							});
-
-							contentPropDropdown.value = this.plugin.settings.blockContentPropertyAlias || '';
-						}
-					});
-				})
-				.addDropdown(dropdown => {
-					contentPropDropdown = dropdown.selectEl;
-
-					contentPropDropdown.innerHTML = '';
-					const defaultOption = createEl('option');
-					defaultOption.value = '';
-					defaultOption.text = '[Select Property]';
-					contentPropDropdown.appendChild(defaultOption);
-
-					if (this.cachedElementTypeProperties.length > 0) {
-						this.cachedElementTypeProperties.forEach((prop: UmbracoProperty) => {
-							const option = createEl('option');
-							option.value = prop.alias;
-							option.text = prop.name || prop.alias;
-							contentPropDropdown?.appendChild(option);
-						});
-					}
-
-					contentPropDropdown.value = this.plugin.settings.blockContentPropertyAlias || '';
-
-					dropdown.onChange(async (value) => {
-						this.plugin.settings.blockContentPropertyAlias = value;
-						await this.plugin.saveSettings();
-					});
-				});
-		}
-
-		// Optional document-level properties mapped from Obsidian frontmatter
-		tagsDropdownEl = this.renderOptionalPropertySetting(
-			containerEl,
-			'Tags property',
-			'Select the tags property on your document type (optional)',
-			'tagsAlias'
-		);
-
-		descriptionDropdownEl = this.renderOptionalPropertySetting(
-			containerEl,
-			'Description property',
-			'Select the property for the note\'s frontmatter description (optional). Sent as plain text to a text area, markdown or rich text property.',
-			'descriptionAlias'
-		);
-	}
+        selectEl.value = selected || '';
+    }
 }

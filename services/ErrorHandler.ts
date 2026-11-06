@@ -1,7 +1,7 @@
 import { Notice } from 'obsidian';
 
 export class ErrorHandler {
-    static handle(error: unknown, context: string = 'Operation'): void {
+    static handle(error: unknown, context = 'Operation'): void {
         let message = `${context} failed`;
         
         if (typeof error === 'object' && error !== null && 'message' in error) {
@@ -13,7 +13,7 @@ export class ErrorHandler {
         new Notice(message);
     }
 
-    static async handleAsync(error: unknown, context: string = 'Operation'): Promise<void> {
+    static async handleAsync(error: unknown, context = 'Operation'): Promise<void> {
         return Promise.resolve(this.handle(error, context));
     }
 }
