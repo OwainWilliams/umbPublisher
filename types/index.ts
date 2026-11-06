@@ -61,7 +61,6 @@ export interface TokenResponse {
 }
 
 export interface umbpublisherSettings {
-    mySetting: string;
     websiteUrl: string;
     blogParentNodeId: string;
     blogDocTypeAlias: string;
@@ -80,7 +79,6 @@ export interface umbpublisherSettings {
 }
 
 export const DEFAULT_SETTINGS: umbpublisherSettings = {
-    mySetting: 'default',
     blogParentNodeId: 'null',
     blogDocTypeAlias: 'BlogPost',
     blogDocTypeId: '',
