@@ -1,6 +1,6 @@
 {
 	"name": "umbpublisher",
-	"version": "1.7.3",
+	"version": "1.7.4",
 	"description": "Send Obsidian Notes to Umbraco CMS via Management API",
 	"main": "main.js",
 	"scripts": {
