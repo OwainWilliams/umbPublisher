@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Restored `minAppVersion` 1.14.4 in `manifest.json`. 1.7.3 shipped the new settings tab with `minAppVersion` 1.10.6, so on Obsidian before 1.13 its settings would not render
+  - `versions.json` now maps 1.7.3 to 1.14.4 too, so older Obsidian versions are offered 1.7.2 instead
+- Removed the unused `mySetting` setting left over from Obsidian's sample plugin
+
 ## [1.7.3] - 2026-11-06
 
 ### Changed
