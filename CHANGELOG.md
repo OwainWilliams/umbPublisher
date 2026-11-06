@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Settings tab rebuilt on Obsidian's declarative settings API, so umbPublisher settings now appear in Obsidian's settings search
+  - Settings are grouped under headings: Umbraco connection, Content location, Content mode, the mode's own settings, and Optional properties
+  - Resolves the "PluginSettingTab does not implement getSettingDefinitions()" warning
+- **Requires Obsidian 1.14.4 or later** (`minAppVersion` raised from 1.10.6). Older Obsidian versions stay on umbPublisher 1.6.0
+- Updated the `obsidian` API package to 1.14.4
+- Release assets (`main.js`, `manifest.json`, `styles.css`) now have signed GitHub build provenance attestations
+- Image embeds are resolved with Obsidian's link resolver and a direct path lookup, so the plugin no longer enumerates every file in the vault
+- GUIDs for new documents and blocks are generated from `crypto.getRandomValues` instead of `Math.random`
+- Replaced the deprecated `workspace.activeLeaf` with `getActiveViewOfType(MarkdownView)`
+- Removed unused code flagged by the plugin review and lint (`Editor` import, `randomBytes`, `start`, redundant type annotations)
+
 ## [1.6.0]
 
 ### Added

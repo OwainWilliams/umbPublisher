@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # Required by actions/attest-build-provenance to sign and store attestations
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v3
 
@@ -24,6 +27,16 @@ jobs:
 
       - name: Build plugin
         run: npm run build
+
+      # Signed build provenance for each release asset, so users can verify
+      # them with `gh attestation verify <file> --repo OwainWilliams/umbPublisher`
+      - name: Attest release assets
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
 
       - name: Create release
         env:
